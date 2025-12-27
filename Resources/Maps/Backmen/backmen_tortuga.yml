@@ -166377,7 +166377,7 @@ entities:
     - type: Transform
       pos: -82.5,2.5
       parent: 2
-    - type: Advertise
+    - type: DatasetVocalizer
       nextAdvertisementTime: 968.2662534
   - uid: 24825
     components:

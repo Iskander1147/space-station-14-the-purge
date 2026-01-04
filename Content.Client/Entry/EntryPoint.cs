@@ -82,30 +82,33 @@ namespace Content.Client.Entry
 
 
         // start-backmen: ioc
-        //[Dependency] private readonly Content.Corvax.Interfaces.Client.IClientSponsorsManager _sponsorsManager = default!; // Corvax-Sponsors
-        //[Dependency] private readonly Content.Corvax.Interfaces.Client.IClientJoinQueueManager _queueManager = default!; // Corvax-Queue
-        //[Dependency] private readonly Content.Corvax.Interfaces.Client.IClientDiscordAuthManager _discordAuthManager = default!; // Corvax-DiscordAuth
+        [Dependency] private readonly Content.Corvax.Interfaces.Shared.ISharedSponsorsManager _sponsorsManager = default!; // Corvax-Sponsors
+        [Dependency] private readonly Content.Corvax.Interfaces.Client.IClientJoinQueueManager _queueManager = default!; // Corvax-Queue
+        [Dependency] private readonly Content.Corvax.Interfaces.Client.IClientDiscordAuthManager _discordAuthManager = default!; // Corvax-DiscordAuth
+        [Dependency] private readonly Content.Corvax.Interfaces.Shared.ISharedLoadoutsManager _sharedLoadoutsManager = default!;
         // end-backmen: ioc
 
-        public override void Init()
+        public override void PreInit()
         {
-            ClientContentIoC.Register();
+            ClientContentIoC.Register(Dependencies);
 
             foreach (var callback in TestingCallbacks)
             {
                 var cast = (ClientModuleTestingCallbacks) callback;
                 cast.ClientBeforeIoC?.Invoke();
             }
+        }
 
-            IoCManager.BuildGraph();
-            IoCManager.InjectDependencies(this);
+        public override void Init()
+        {
+            Dependencies.BuildGraph();
+            Dependencies.InjectDependencies(this);
 
             _contentLoc.Initialize();
             _componentFactory.DoAutoRegistrations();
             _componentFactory.IgnoreMissingComponents();
 
             // Do not add to these, they are legacy.
-            _componentFactory.RegisterClass<SharedGravityGeneratorComponent>();
             _componentFactory.RegisterClass<SharedAmeControllerComponent>();
             // Do not add to the above, they are legacy
 
@@ -120,7 +123,6 @@ namespace Content.Client.Entry
             _prototypeManager.RegisterIgnore("htnPrimitive");
             _prototypeManager.RegisterIgnore("gameMap");
             _prototypeManager.RegisterIgnore("gameMapPool");
-            _prototypeManager.RegisterIgnore("lobbyBackground");
             _prototypeManager.RegisterIgnore("gamePreset");
             _prototypeManager.RegisterIgnore("noiseChannel");
             _prototypeManager.RegisterIgnore("playerConnectionWhitelist");
@@ -167,12 +169,6 @@ namespace Content.Client.Entry
             _configManager.SetCVar("interface.resolutionAutoScaleMinimum", 0.5f);
         }
 
-        public override void Shutdown()
-        {
-            base.Shutdown();
-            _titleWindowManager.Shutdown();
-        }
-
         public override void PostInit()
         {
             base.PostInit();
@@ -197,10 +193,10 @@ namespace Content.Client.Entry
             _titleWindowManager.Initialize();
 
             // start-backmen: ioc
-            IoCManager.Resolve<Content.Corvax.Interfaces.Shared.ISharedSponsorsManager>().Initialize();
-            IoCManager.Resolve<Content.Corvax.Interfaces.Client.IClientJoinQueueManager>().Initialize();
-            IoCManager.Resolve<Content.Corvax.Interfaces.Client.IClientDiscordAuthManager>().Initialize();
-            IoCManager.Resolve<Content.Corvax.Interfaces.Shared.ISharedLoadoutsManager>().Initialize();
+            _sponsorsManager.Initialize();
+            _queueManager.Initialize();
+            _discordAuthManager.Initialize();
+            _sharedLoadoutsManager.Initialize();
             // end-backmen: ioc
 
             _baseClient.RunLevelChanged += (_, args) =>

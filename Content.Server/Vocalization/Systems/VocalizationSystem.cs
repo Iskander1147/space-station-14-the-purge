@@ -78,6 +78,7 @@ public sealed partial class VocalizationSystem : EntitySystem
         // raise a VocalizeEvent
         // this can be handled by other systems to speak using a method other than local chat
         var vocalizeEvent = new VocalizeEvent(message);
+        vocalizeEvent.LanguageOverride = language;
         RaiseLocalEvent(entity.Owner, ref vocalizeEvent);
 
         // if the event is handled, don't try speaking
@@ -139,5 +140,6 @@ public record struct TryVocalizeEvent(string? Message = null, bool Handled = fal
 /// </summary>
 /// <param name="Message">Message to send</param>
 /// <param name="Handled">Whether the message was handled by a system</param>
+/// <param name="LanguageOverride"></param>
 [ByRefEvent]
-public record struct VocalizeEvent(string Message, bool Handled = false);
+public record struct VocalizeEvent(string Message, bool Handled = false, ProtoId<LanguagePrototype>? LanguageOverride = null); //backmen

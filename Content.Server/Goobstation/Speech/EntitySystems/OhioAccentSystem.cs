@@ -1,25 +1,35 @@
 using System.Text.RegularExpressions;
 using Content.Server.Speech.Components;
 using Content.Shared.Speech;
+using Content.Shared.StatusEffectNew;
 using Robust.Shared.Random;
 
 namespace Content.Server.Speech.EntitySystems;
 
-public sealed class OhioAccentSystem : EntitySystem
+public sealed partial class OhioAccentSystem : EntitySystem
 {
-    [Dependency] private readonly IRobustRandom _random = default!;
-    [Dependency] private readonly ReplacementAccentSystem _replacement = default!;
+    [Dependency] private IRobustRandom _random = default!;
+    [Dependency] private ReplacementAccentSystem _replacement = default!;
 
     public override void Initialize()
     {
         base.Initialize();
         SubscribeLocalEvent<OhioAccentComponent, AccentGetEvent>(OnAccent);
+        SubscribeLocalEvent<OhioAccentComponent, StatusEffectRelayedEvent<AccentGetEvent>>(OnAccentRelayed);
     }
 
-    private void OnAccent(EntityUid uid, OhioAccentComponent component, AccentGetEvent args)
+    private void OnAccentRelayed(Entity<OhioAccentComponent> ent, ref StatusEffectRelayedEvent<AccentGetEvent> args)
     {
-        var message = args.Message;
+        args.Args.Message = Accentuate(args.Args.Message);
+    }
 
+    private void OnAccent(Entity<OhioAccentComponent> ent, ref AccentGetEvent args)
+    {
+        args.Message = Accentuate(args.Message);
+    }
+
+    public string Accentuate(string message)
+    {
         message = _replacement.ApplyReplacements(message, "ohio");
 
         // Prefix
@@ -42,6 +52,6 @@ public sealed class OhioAccentSystem : EntitySystem
             message += Loc.GetString($"accent-ohio-suffix-{pick}");
         }
 
-        args.Message = message;
+        return message;
     }
 };

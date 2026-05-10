@@ -22,17 +22,18 @@ using Robust.Shared.Prototypes;
 
 namespace Content.Server.Backmen.Species.Shadowkin.Systems;
 
-public sealed class ShadowkinTeleportSystem : EntitySystem
+public sealed partial class ShadowkinTeleportSystem : EntitySystem
 {
-    [Dependency] private readonly ShadowkinPowerSystem _power = default!;
-    [Dependency] private readonly SharedTransformSystem _transform = default!;
-    [Dependency] private readonly SharedAudioSystem _audio = default!;
-    [Dependency] private readonly SharedStaminaSystem _stamina = default!;
-    [Dependency] private readonly PullingSystem _pulling = default!;
-    [Dependency] private readonly SharedActionsSystem _actions = default!;
-    [Dependency] private readonly MagicSystem _magic = default!;
-    [Dependency] private readonly SharedInteractionSystem _interaction = default!;
-    [Dependency] private readonly TagSystem _tagSystem = default!;
+    [Dependency] private ShadowkinPowerSystem _power = default!;
+    [Dependency] private SharedTransformSystem _transform = default!;
+    [Dependency] private SharedAudioSystem _audio = default!;
+    [Dependency] private SharedStaminaSystem _stamina = default!;
+    [Dependency] private PullingSystem _pulling = default!;
+    [Dependency] private SharedActionsSystem _actions = default!;
+    [Dependency] private MagicSystem _magic = default!;
+    [Dependency] private SharedInteractionSystem _interaction = default!;
+    [Dependency] private TagSystem _tagSystem = default!;
+    [Dependency] private Shared.StatusEffectNew.StatusEffectsSystem _statusEffects = default!;
 
     public override void Initialize()
     {
@@ -44,7 +45,8 @@ public sealed class ShadowkinTeleportSystem : EntitySystem
         SubscribeLocalEvent<ShadowkinTeleportPowerComponent, ShadowkinTeleportEvent>(Teleport);
     }
 
-    private readonly EntProtoId ShadowkinTeleport = "ShadowkinTeleport";
+    private static readonly EntProtoId ShadowkinTeleport = "ShadowkinTeleport";
+    private static readonly ProtoId<TagPrototype> Structure = "Structure";
     private void OnInit(Entity<ShadowkinTeleportPowerComponent> ent, ref ComponentInit args)
     {
         _actions.AddAction(ent, ref ent.Comp.ShadowkinTeleportAction, ShadowkinTeleport);
@@ -55,14 +57,14 @@ public sealed class ShadowkinTeleportSystem : EntitySystem
         _actions.RemoveAction(uid, component.ShadowkinTeleportAction);
     }
 
-    private static SoundSpecifier _soundTeleport = new SoundPathSpecifier("/Audio/Backmen/Effects/Shadowkin/Powers/teleport.ogg");
+    private static readonly SoundSpecifier SoundTeleport = new SoundPathSpecifier("/Audio/Backmen/Effects/Shadowkin/Powers/teleport.ogg");
     public bool DoTeleport(EntityUid user, EntityCoordinates target, SoundSpecifier? sound = null, float? soundVolume = 5f)
     {
         if(!_interaction.InRangeUnobstructed(user,
                target,
                0,
                CollisionGroup.Opaque,
-               predicate: (ent) => _tagSystem.HasTag(ent, "Structure"),
+               predicate: (ent) => _tagSystem.HasTag(ent, Structure),
                popup:true))
             return false;
 
@@ -103,7 +105,7 @@ public sealed class ShadowkinTeleportSystem : EntitySystem
         }
 
         // Play the teleport sound
-        _audio.PlayPvs(sound ?? _soundTeleport, user, AudioParams.Default.WithVolume(soundVolume ?? 5f));
+        _audio.PlayPvs(sound ?? SoundTeleport, user, AudioParams.Default.WithVolume(soundVolume ?? 5f));
 
         return true;
     }
@@ -117,6 +119,9 @@ public sealed class ShadowkinTeleportSystem : EntitySystem
         // Don't activate abilities if handcuffed
         // TODO: Something like the Psionic Headcage to disable powers for Shadowkin
         if (HasComp<HandcuffComponent>(args.Performer) || HasComp<PsionicInsulationComponent>(args.Performer))
+            return;
+
+        if(_statusEffects.HasEffectComp<PsionicInsulationComponent>(args.Performer))
             return;
 
         if(!DoTeleport(args.Performer, args.Target, args.Sound, args.Volume))

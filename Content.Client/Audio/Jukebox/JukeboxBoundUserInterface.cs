@@ -1,17 +1,14 @@
 using Content.Shared.Audio.Jukebox;
 using Robust.Client.Audio;
 using Robust.Client.UserInterface;
-using Robust.Shared.Audio;
 using Robust.Shared.Audio.Components;
 using Robust.Shared.Prototypes;
 
 namespace Content.Client.Audio.Jukebox;
 
-public sealed class JukeboxBoundUserInterface : BoundUserInterface
+public sealed partial class JukeboxBoundUserInterface : BoundUserInterface
 {
-    [Dependency] private readonly IPrototypeManager _protoManager = default!;
-
-    private readonly AudioSystem _audio;
+    [Dependency] private IPrototypeManager _protoManager = default!;
 
     [ViewVariables]
     private JukeboxMenu? _menu;
@@ -19,8 +16,6 @@ public sealed class JukeboxBoundUserInterface : BoundUserInterface
     public JukeboxBoundUserInterface(EntityUid owner, Enum uiKey) : base(owner, uiKey)
     {
         IoCManager.InjectDependencies(this);
-
-        _audio = EntMan.System<AudioSystem>();
     }
 
     protected override void Open()
@@ -65,7 +60,7 @@ public sealed class JukeboxBoundUserInterface : BoundUserInterface
 
         if (_protoManager.Resolve(jukebox.SelectedSongId, out var songProto))
         {
-            var length = _audio.GetAudioLength(_audio.ResolveSound(new SoundPathSpecifier(songProto.Path.Path)));
+            var length = EntMan.System<AudioSystem>().GetAudioLength(songProto.Path.Path.ToString());
             _menu.SetSelectedSong(songProto.Name, (float) length.TotalSeconds);
         }
         else
@@ -103,4 +98,3 @@ public sealed class JukeboxBoundUserInterface : BoundUserInterface
         SendMessage(new JukeboxSetTimeMessage(sentTime));
     }
 }
-

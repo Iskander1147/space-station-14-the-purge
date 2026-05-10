@@ -28,18 +28,19 @@ using Content.Shared.Chat;
 
 namespace Content.Server.Backmen.Research.Oracle;
 
-public sealed class OracleSystem : EntitySystem
+public sealed partial class OracleSystem : EntitySystem
 {
-    [Dependency] private readonly IPrototypeManager _prototypeManager = default!;
-    [Dependency] private readonly IRobustRandom _random = default!;
-    [Dependency] private readonly ChatSystem _chat = default!;
-    [Dependency] private readonly IChatManager _chatManager = default!;
-    [Dependency] private readonly SharedSolutionContainerSystem _solutionSystem = default!;
-    [Dependency] private readonly GlimmerSystem _glimmerSystem = default!;
-    [Dependency] private readonly PuddleSystem _puddleSystem = default!;
-    [Dependency] private readonly SharedBodySystem _body = default!;
-    [Dependency] private readonly AppearanceSystem _appearance = default!;
-    [Dependency] private readonly EntityTableSystem _entityTable = default!;
+    [Dependency] private IPrototypeManager _prototypeManager = default!;
+    [Dependency] private IRobustRandom _random = default!;
+    [Dependency] private ChatSystem _chat = default!;
+    [Dependency] private IChatManager _chatManager = default!;
+    [Dependency] private SharedSolutionContainerSystem _solutionSystem = default!;
+    [Dependency] private GlimmerSystem _glimmerSystem = default!;
+    [Dependency] private PuddleSystem _puddleSystem = default!;
+    [Dependency] private SharedBodySystem _body = default!;
+    [Dependency] private AppearanceSystem _appearance = default!;
+    [Dependency] private EntityTableSystem _entityTable = default!;
+    [Dependency] private Shared.StatusEffectNew.StatusEffectsSystem _statusEffects = default!;
 
 
     public readonly IReadOnlyList<ProtoId<ReagentPrototype>> RewardReagents =
@@ -167,8 +168,7 @@ public sealed class OracleSystem : EntitySystem
 
     private void OnGibOnCollide(EntityUid uid, OracleComponent component, GibOnCollideAttemptEvent args)
     {
-        var oracleEntity = new Entity<OracleComponent>(uid, component);
-        HandleGibEvent(oracleEntity);
+        HandleGibEvent((uid, component));
     }
 
     private void HandleGibEvent(Entity<OracleComponent> ent)
@@ -206,6 +206,9 @@ public sealed class OracleSystem : EntitySystem
     private void OnInteractHand(EntityUid uid, OracleComponent component, InteractHandEvent args)
     {
         if (!HasComp<PotentialPsionicComponent>(args.User) || HasComp<PsionicInsulationComponent>(args.User))
+            return;
+
+        if (_statusEffects.HasEffectComp<PsionicInsulationComponent>(args.User))
             return;
 
         if (!TryComp<ActorComponent>(args.User, out var actor))
@@ -247,18 +250,16 @@ public sealed class OracleSystem : EntitySystem
         if (HasComp<MobStateComponent>(args.Used))
             return;
 
-        if (!TryComp<MetaDataComponent>(args.Used, out var meta))
+        var proto = Prototype(args.Used);
+        if (proto == null)
             return;
 
-        if (meta.EntityPrototype == null)
-            return;
-
-        var validItem = CheckValidity(meta.EntityPrototype, component.DesiredPrototype);
+        var validItem = CheckValidity(proto, component.DesiredPrototype);
 
         var nextItem = true;
 
         if (component.LastDesiredPrototype != null &&
-            CheckValidity(meta.EntityPrototype, component.LastDesiredPrototype))
+            CheckValidity(proto, component.LastDesiredPrototype))
         {
             nextItem = false;
             validItem = true;
@@ -331,7 +332,7 @@ public sealed class OracleSystem : EntitySystem
         _solutionSystem.TryMixAndOverflow(fountainEnt.Value, sol, fountainSol.MaxVolume, out var overflowing);
 
         if (overflowing != null && overflowing.Volume > 0)
-            _puddleSystem.TrySpillAt(uid, overflowing, out var _);
+            _puddleSystem.TrySpillAt(uid, overflowing, out _);
     }
 
     private void NextItem(OracleComponent component)

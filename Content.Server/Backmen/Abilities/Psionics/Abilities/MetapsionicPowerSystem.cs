@@ -5,18 +5,18 @@ using Content.Shared.Backmen.Species.Shadowkin.Components;
 using Content.Shared.Eye;
 using Content.Shared.StatusEffectNew;
 using Content.Shared.Popups;
+using Content.Shared.StatusEffectNew.Components;
 using Robust.Shared.Prototypes;
 
 namespace Content.Server.Backmen.Abilities.Psionics;
 
-public sealed class MetapsionicPowerSystem : EntitySystem
+public sealed partial class MetapsionicPowerSystem : StatusEffectGrantedPowerSystem<MetapsionicPowerComponent, MetapsionicPowerActionEvent>
 {
-    [Dependency] private readonly StatusEffectsSystem _statusEffects = default!;
-    [Dependency] private readonly SharedActionsSystem _actions = default!;
-    [Dependency] private readonly EntityLookupSystem _lookup = default!;
-    [Dependency] private readonly SharedPopupSystem _popups = default!;
-    [Dependency] private readonly SharedPsionicAbilitiesSystem _psionics = default!;
-    [Dependency] private readonly SharedEyeSystem _eye = default!;
+    [Dependency] private SharedActionsSystem _actions = default!;
+    [Dependency] private EntityLookupSystem _lookup = default!;
+    [Dependency] private SharedPopupSystem _popups = default!;
+    [Dependency] private SharedPsionicAbilitiesSystem _psionics = default!;
+    [Dependency] private SharedEyeSystem _eye = default!;
 
     private EntityQuery<PsionicInsulationComponent>  _insulationQuery;
 
@@ -24,13 +24,27 @@ public sealed class MetapsionicPowerSystem : EntitySystem
     public override void Initialize()
     {
         base.Initialize();
-        SubscribeLocalEvent<MetapsionicPowerComponent, ComponentInit>(OnInit);
-        SubscribeLocalEvent<MetapsionicPowerComponent, MetapsionicPowerActionEvent>(OnPowerUsed);
+        InitializeStatusEffectGrantedPower();
         SubscribeLocalEvent<MetapsionicVisibleComponent, ComponentStartup>(OnAddCanSeeAll);
         SubscribeLocalEvent<MetapsionicVisibleComponent, ComponentShutdown>(OnRemoveCanSeeAll);
+
         SubscribeLocalEvent<MetapsionicVisibleComponent, GetVisMaskEvent>(OnGetVisMask);
+        SubscribeLocalEvent<MetapsionicVisibleComponent, StatusEffectAppliedEvent>(OnApplied);
+        SubscribeLocalEvent<MetapsionicVisibleComponent, StatusEffectRemovedEvent>(OnRemoved);
 
         _insulationQuery = GetEntityQuery<PsionicInsulationComponent>();
+    }
+
+    private void OnRemoved(Entity<MetapsionicVisibleComponent> ent, ref StatusEffectRemovedEvent args)
+    {
+        RemComp<MetapsionicVisibleComponent>(args.Target);
+        _eye.RefreshVisibilityMask(args.Target);
+    }
+
+    private void OnApplied(Entity<MetapsionicVisibleComponent> ent, ref StatusEffectAppliedEvent args)
+    {
+        EnsureComp<MetapsionicVisibleComponent>(args.Target);
+        _eye.RefreshVisibilityMask(args.Target);
     }
 
     private void OnGetVisMask(Entity<MetapsionicVisibleComponent> ent, ref GetVisMaskEvent args)
@@ -56,7 +70,7 @@ public sealed class MetapsionicPowerSystem : EntitySystem
 
     private static readonly EntProtoId ActionMetapsionicPulse = "ActionMetapsionicPulse";
 
-    private void OnInit(EntityUid uid, MetapsionicPowerComponent component, ComponentInit args)
+    protected override void EnsurePowerActions(EntityUid uid, MetapsionicPowerComponent component)
     {
         _actions.AddAction(uid, ref component.MetapsionicPowerAction, ActionMetapsionicPulse);
 
@@ -68,23 +82,28 @@ public sealed class MetapsionicPowerSystem : EntitySystem
             psionic.PsionicAbility = component.MetapsionicPowerAction;
     }
 
+    protected override void RemovePowerActions(EntityUid uid, MetapsionicPowerComponent component)
+    {
+        _actions.RemoveAction(uid, component.MetapsionicPowerAction);
+    }
+
     private static readonly EntProtoId MetapsionicVisibleStatus = "StatusEffectPsionicAllSee";
 
-    private void OnPowerUsed(EntityUid uid, MetapsionicPowerComponent component, MetapsionicPowerActionEvent args)
+    protected override void HandlePowerUse(EntityUid uid, MetapsionicPowerComponent component, MetapsionicPowerActionEvent args)
     {
-        if(args.Handled)
+        if (args.Handled)
             return;
 
-        _statusEffects.TryAddStatusEffectDuration(uid, MetapsionicVisibleStatus, TimeSpan.FromSeconds(10));
-        var coord = Transform(uid).Coordinates;
+        StatusEffects.TryAddStatusEffectDuration(args.Performer, MetapsionicVisibleStatus, TimeSpan.FromSeconds(10));
+        var coord = Transform(args.Performer).Coordinates;
 
         foreach (var entity in _lookup.GetEntitiesInRange<PsionicComponent>(coord, component.Range))
         {
-            if (entity.Owner != uid && !_insulationQuery.HasComp(entity)
+            if (entity.Owner != args.Performer && !_insulationQuery.HasComp(entity)
                                     //&& !(HasComp<ClothingGrantPsionicPowerComponent>(entity) && Transform(entity).ParentUid == uid)
                                     )
             {
-                _popups.PopupEntity(Loc.GetString("metapsionic-pulse-success"), uid, uid, PopupType.LargeCaution);
+                _popups.PopupEntity(Loc.GetString("metapsionic-pulse-success"), args.Performer, args.Performer, PopupType.LargeCaution);
                 args.Handled = true;
                 return;
             }
@@ -92,17 +111,17 @@ public sealed class MetapsionicPowerSystem : EntitySystem
 
         foreach (var entity in _lookup.GetEntitiesInRange<ShadowkinDarkSwappedComponent>(coord, component.Range))
         {
-            if (entity.Owner != uid && !_insulationQuery.HasComp(entity)
+            if (entity.Owner != args.Performer && !_insulationQuery.HasComp(entity)
                 //&& !(HasComp<ClothingGrantPsionicPowerComponent>(entity) && Transform(entity).ParentUid == uid)
                )
             {
-                _popups.PopupEntity(Loc.GetString("metapsionic-pulse-shadowkin-success"), uid, uid, PopupType.LargeCaution);
+                _popups.PopupEntity(Loc.GetString("metapsionic-pulse-shadowkin-success"), args.Performer, args.Performer, PopupType.LargeCaution);
                 args.Handled = true;
                 return;
             }
         }
-        _popups.PopupEntity(Loc.GetString("metapsionic-pulse-failure"), uid, uid, PopupType.Large);
-        _psionics.LogPowerUsed(uid, "metapsionic pulse", 2, 4);
+        _popups.PopupEntity(Loc.GetString("metapsionic-pulse-failure"), args.Performer, args.Performer, PopupType.Large);
+        _psionics.LogPowerUsed(args.Performer, "metapsionic pulse", 2, 4);
 
         args.Handled = true;
     }

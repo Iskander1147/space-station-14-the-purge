@@ -2,6 +2,8 @@ using Content.Shared.Backmen.Language;
 using Content.Shared.Backmen.Language.Events;
 using Content.Shared.Backmen.Language.Systems;
 using Robust.Client;
+using Robust.Client.Player;
+using Robust.Shared.Player;
 using Robust.Shared.Prototypes;
 
 namespace Content.Client.Backmen.Language.Systems;
@@ -15,56 +17,54 @@ namespace Content.Client.Backmen.Language.Systems;
 /// </remarks>
 public sealed partial class LanguageSystem : SharedLanguageSystem
 {
-    [Dependency] private IBaseClient _client = default!;
-
     /// <summary>
     ///   The current language of the entity currently possessed by the player.
     /// </summary>
-    public ProtoId<LanguagePrototype> CurrentLanguage { get; private set; } = default!;
+    public ProtoId<LanguagePrototype> CurrentLanguage => GetCurrentLanguage()?.CurrentLanguage ?? default;
     /// <summary>
     ///   The list of languages the currently possessed entity can speak.
     /// </summary>
-    public List<ProtoId<LanguagePrototype>> SpokenLanguages { get; private set; } = new();
+    public HashSet<ProtoId<LanguagePrototype>> SpokenLanguages => GetCurrentLanguage()?.SpokenLanguages ?? [];
     /// <summary>
     ///   The list of languages the currently possessed entity can understand.
     /// </summary>
-    public List<ProtoId<LanguagePrototype>> UnderstoodLanguages { get; private set; } = new();
+    public HashSet<ProtoId<LanguagePrototype>> UnderstoodLanguages => GetCurrentLanguage()?.UnderstoodLanguages ?? [];
 
-    public event EventHandler<LanguagesUpdatedMessage>? OnLanguagesChanged;
+    public event EventHandler<Entity<LanguageSpeakerComponent>>? OnLanguagesChanged;
+
+    [Dependency] private IPlayerManager _playerManager = default!;
 
     public override void Initialize()
     {
         base.Initialize();
-
-        SubscribeNetworkEvent<LanguagesUpdatedMessage>(OnLanguagesUpdated);
-        _client.RunLevelChanged += OnRunLevelChanged;
+        SubscribeLocalEvent<LanguageSpeakerComponent, LocalPlayerAttachedEvent>(OnPlayerAttached);
+        SubscribeLocalEvent<LanguageSpeakerComponent, LocalPlayerDetachedEvent>(OnPlayerDetached);
+        SubscribeLocalEvent<LanguageSpeakerComponent, AfterAutoHandleStateEvent>(OnLanguagesState);
     }
 
-    private void OnLanguagesUpdated(LanguagesUpdatedMessage message)
+    private LanguageSpeakerComponent? GetCurrentLanguage()
     {
-        // TODO this entire thing is horrible. If someone is willing to refactor this, LanguageSpeakerComponent should become shared with SendOnlyToOwner = true
-        // That way, this system will be able to use the existing networking infrastructure instead of relying on this makeshift... whatever this is.
-        CurrentLanguage = message.CurrentLanguage;
-        SpokenLanguages = message.Spoken;
-        UnderstoodLanguages = message.Understood;
+        return CompOrNull<LanguageSpeakerComponent>(_playerManager.LocalEntity);
+    }
 
+    private void OnLanguagesState(Entity<LanguageSpeakerComponent> ent, ref AfterAutoHandleStateEvent args)
+    {
+        OnLanguagesUpdated(ent);
+    }
+
+    private void OnPlayerDetached(Entity<LanguageSpeakerComponent> ent, ref LocalPlayerDetachedEvent args)
+    {
+        OnLanguagesUpdated(ent);
+    }
+
+    private void OnPlayerAttached(Entity<LanguageSpeakerComponent> ent, ref LocalPlayerAttachedEvent args)
+    {
+        OnLanguagesUpdated(ent);
+    }
+
+    private void OnLanguagesUpdated(Entity<LanguageSpeakerComponent> message)
+    {
         OnLanguagesChanged?.Invoke(this, message);
-    }
-
-    private void OnRunLevelChanged(object? sender, RunLevelChangedEventArgs args)
-    {
-        // Request an update when entering a game
-        if (args.NewLevel == ClientRunLevel.InGame)
-            RequestStateUpdate();
-    }
-
-    /// <summary>
-    ///   Sends a network request to the server to update this system's state.
-    ///   The server may ignore the said request if the player is not possessing an entity.
-    /// </summary>
-    public void RequestStateUpdate()
-    {
-        RaiseNetworkEvent(new RequestLanguagesMessage());
     }
 
     public void RequestSetLanguage(LanguagePrototype language)
@@ -76,7 +76,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
 
         // May cause some minor desync...
         // So to reduce the probability of desync, we replicate the change locally too
-        if (SpokenLanguages.Contains(language.ID))
-            CurrentLanguage = language.ID;
+        if (GetCurrentLanguage() is {} cur && cur.SpokenLanguages.Contains(language.ID))
+            cur.CurrentLanguage = language.ID;
     }
 }

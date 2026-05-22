@@ -1,5 +1,4 @@
 using System.Linq;
-using Content.Server.Backmen.Language.Events;
 using Content.Server.Backmen.Speech.Components;
 using Content.Shared.Backmen.Language;
 using Content.Shared.Backmen.Language.Components;
@@ -7,6 +6,7 @@ using Content.Shared.Backmen.Language.Systems;
 using Content.Shared.Paper;
 using Content.Shared.Speech;
 using Content.Shared.StatusEffectNew;
+using Robust.Shared.Player;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 using UniversalLanguageSpeakerComponent = Content.Shared.Backmen.Language.Components.UniversalLanguageSpeakerComponent;
@@ -101,7 +101,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
     {
         if (!_languageSpeakerQuery.Resolve(speaker, ref speaker.Comp, logMissing: false)
             || string.IsNullOrEmpty(speaker.Comp.CurrentLanguage)
-            || !_prototype.TryIndex(speaker.Comp.CurrentLanguage, out var proto))
+            || !PrototypeManager.TryIndex(speaker.Comp.CurrentLanguage, out var proto))
             return Universal;
 
         return proto;
@@ -111,7 +111,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
     ///     Returns the list of languages this entity can speak.
     /// </summary>
     /// <remarks>Typically, checking <see cref="LanguageSpeakerComponent.SpokenLanguages"/> is sufficient.</remarks>
-    public List<ProtoId<LanguagePrototype>> GetSpokenLanguages(Entity<LanguageSpeakerComponent?> uid)
+    public HashSet<ProtoId<LanguagePrototype>> GetSpokenLanguages(Entity<LanguageSpeakerComponent?> uid)
     {
         if (!_languageSpeakerQuery.Resolve(uid, ref uid.Comp, logMissing: false))
             return [];
@@ -123,7 +123,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
     ///     Returns the list of languages this entity can understand.
     /// </summary>
     /// <remarks>Typically, checking <see cref="LanguageSpeakerComponent.UnderstoodLanguages"/> is sufficient.</remarks>
-    public List<ProtoId<LanguagePrototype>> GetUnderstoodLanguages(Entity<LanguageSpeakerComponent?> uid)
+    public HashSet<ProtoId<LanguagePrototype>> GetUnderstoodLanguages(Entity<LanguageSpeakerComponent?> uid)
     {
         if (!_languageSpeakerQuery.Resolve(uid, ref uid.Comp, logMissing: false))
             return [];
@@ -139,7 +139,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
             return;
 
         speaker.Comp.CurrentLanguage = language;
-        RaiseLocalEvent(speaker, new LanguagesUpdateEvent(), true);
+        Dirty(speaker);
     }
 
     /// <summary>
@@ -197,7 +197,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
         if (!entity.Comp.SpokenLanguages.Contains(entity.Comp.CurrentLanguage ?? ""))
         {
             entity.Comp.CurrentLanguage = entity.Comp.SpokenLanguages.FirstOrDefault(UniversalPrototype);
-            RaiseLocalEvent(entity, new LanguagesUpdateEvent());
+            Dirty(entity);
             return true;
         }
 
@@ -238,11 +238,17 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
         entity.Comp1.SpokenLanguages.Clear();
         entity.Comp1.UnderstoodLanguages.Clear();
 
-        entity.Comp1.SpokenLanguages.AddRange(ev.SpokenLanguages);
-        entity.Comp1.UnderstoodLanguages.AddRange(ev.UnderstoodLanguages);
+        foreach (var language in ev.SpokenLanguages)
+        {
+            entity.Comp1.SpokenLanguages.Add(language);
+        }
+        foreach (var language in ev.UnderstoodLanguages)
+        {
+            entity.Comp1.UnderstoodLanguages.Add(language);
+        }
 
         if (!EnsureValidLanguage(entity))
-            RaiseLocalEvent(entity, new LanguagesUpdateEvent());
+            Dirty(entity,entity.Comp1);
     }
 
     #endregion

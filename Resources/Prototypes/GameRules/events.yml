@@ -251,6 +251,7 @@
         sound: /Audio/Misc/ninja_greeting.ogg
       components:
       - type: SpaceNinja
+      - type: PainImmune
       - type: NpcFactionMember
         factions:
         - Syndicate
@@ -345,6 +346,7 @@
         #sound: "/Audio/Ambience/Antag/wizard_start.ogg"
       # TODO: WizardComp as needed
       components:
+      - type: PainImmune
       - type: NpcFactionMember
         factions:
         - Wizard
@@ -584,6 +586,7 @@
       - RoleSurvivalNukie
       components:
       - type: NukeOperative
+      - type: PainImmune
       - type: RandomMetadata
         nameSegments:
         - NamesSyndicatePrefix

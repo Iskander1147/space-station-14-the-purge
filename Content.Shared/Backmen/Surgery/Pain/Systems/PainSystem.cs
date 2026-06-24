@@ -1,4 +1,6 @@
-﻿using Content.Shared.Backmen.Surgery.Pain.Components;
+﻿using System.Linq;
+using Content.Shared.Backmen.Surgery.Pain.Components;
+using Content.Shared.HealthExaminable;
 using Robust.Shared.Audio.Systems;
 using Robust.Shared.Configuration;
 using Robust.Shared.GameStates;
@@ -14,46 +16,75 @@ public abstract partial class PainSystem : EntitySystem
     [Dependency] protected SharedAudioSystem IHaveNoMouthAndIMustScream = default!;
 
     protected EntityQuery<NerveSystemComponent> NerveSystemQuery;
-    protected EntityQuery<NerveComponent> NerveQuery;
+    protected EntityQuery<NerveOrganComponent> NerveQuery;
 
     public override void Initialize()
     {
         base.Initialize();
 
-        SubscribeLocalEvent<NerveComponent, ComponentHandleState>(OnComponentHandleState);
-        SubscribeLocalEvent<NerveComponent, ComponentGetState>(OnComponentGet);
+        SubscribeLocalEvent<NerveSystemComponent, AfterAutoHandleStateEvent>(OnNerveSystemAfterAutoHandleState);
+        SubscribeLocalEvent<NerveSystemComponent, EntityTerminatingEvent>(OnNerveSystemTerminating);
+        SubscribeLocalEvent<NerveOrganComponent, AfterAutoHandleStateEvent>(OnNerveAfterAutoHandleState);
+        SubscribeLocalEvent<PainImmuneComponent, HealthBeingExaminedEvent>(OnPainImmuneHealthExamined);
 
         NerveSystemQuery = GetEntityQuery<NerveSystemComponent>();
-        NerveQuery = GetEntityQuery<NerveComponent>();
+        NerveQuery = GetEntityQuery<NerveOrganComponent>();
     }
 
-    private void OnComponentHandleState(EntityUid uid, NerveComponent component, ref ComponentHandleState args)
+    private void OnPainImmuneHealthExamined(Entity<PainImmuneComponent> ent, ref HealthBeingExaminedEvent args)
     {
-        if (args.Current is not NerveComponentState state)
-            return;
+        if (!args.Message.IsEmpty)
+            args.Message.PushNewline();
 
-        component.ParentedNerveSystem = TryGetEntity(state.ParentedNerveSystem, out var e) ? e.Value : EntityUid.Invalid;
-        component.PainMultiplier = state.PainMultiplier;
+        args.Message.TryAddMarkup(Loc.GetString("pain-immune-health-examine", ("target", ent.Owner)), out _);
+    }
 
-        component.PainFeelingModifiers.Clear();
-        foreach (var ((modEntity, id), modifier) in state.PainFeelingModifiers)
+    private void OnNerveSystemTerminating(Entity<NerveSystemComponent> ent, ref EntityTerminatingEvent args)
+    {
+        foreach (var (nerveUid, _) in ent.Comp.Nerves.ToArray())
         {
-            component.PainFeelingModifiers.Add((TryGetEntity(modEntity, out var e1) ? e1.Value : EntityUid.Invalid, id), modifier);
+            if (!NerveQuery.TryComp(nerveUid, out var nerve))
+                continue;
+
+            nerve.ParentedNerveSystem = EntityUid.Invalid;
         }
     }
 
-    private void OnComponentGet(EntityUid uid, NerveComponent comp, ref ComponentGetState args)
+    private void OnNerveSystemAfterAutoHandleState(Entity<NerveSystemComponent> ent, ref AfterAutoHandleStateEvent args)
     {
-        var state = new NerveComponentState();
+        SanitizeNerveSystemDictionaries(ent.Comp);
+    }
 
-        state.ParentedNerveSystem = TryGetNetEntity(comp.ParentedNerveSystem, out var ne) ? ne.Value : NetEntity.Invalid;
-        state.PainMultiplier = comp.PainMultiplier;
+    private void OnNerveAfterAutoHandleState(Entity<NerveOrganComponent> ent, ref AfterAutoHandleStateEvent args)
+    {
+        SanitizeNerveDictionaries(ent.Comp);
+    }
 
-        foreach (var ((modEntity, id), modifier) in comp.PainFeelingModifiers)
+    private void SanitizeNerveSystemDictionaries(NerveSystemComponent component)
+    {
+        foreach (var key in component.Modifiers.Keys.ToArray())
         {
-            state.PainFeelingModifiers.Add((TryGetNetEntity(modEntity, out var ne1) ? ne1.Value : NetEntity.Invalid, id), modifier);
+            if (TerminatingOrDeleted(key.Item1))
+                component.Modifiers.Remove(key);
         }
+    }
 
-        args.State = state;
+    private void SanitizeNerveDictionaries(NerveOrganComponent component)
+    {
+        if (component.ParentedNerveSystem != EntityUid.Invalid && TerminatingOrDeleted(component.ParentedNerveSystem))
+            component.ParentedNerveSystem = EntityUid.Invalid;
+
+        foreach (var key in component.PainFeelingModifiers.Keys.ToArray())
+        {
+            if (TerminatingOrDeleted(key.Item1))
+                component.PainFeelingModifiers.Remove(key);
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds nerve links for a nerve system after organs are inserted or removed.
+    /// </summary>
+    public virtual void RefreshNerveSystem(EntityUid nerveSystemUid, EntityUid body)
+    {
     }
 }

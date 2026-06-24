@@ -2,6 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 using Content.Shared.ActionBlocker;
 using Content.Shared.Damage.Components;
 using Content.Shared.DoAfter;
+using Content.Shared.Examine;
+using Content.Shared.HealthExaminable;
 using Content.Shared.IdentityManagement;
 using Content.Shared.Inventory;
 using Content.Shared.Inventory.Events;
@@ -28,6 +30,38 @@ public abstract partial class SharedFleshWormSystem : EntitySystem
         SubscribeLocalEvent<FleshWormComponent, GetVerbsEvent<EquipmentVerb>>(OnGetRemoveVerb);
         SubscribeLocalEvent<FleshWormComponent, InventoryRelayedEvent<GetVerbsEvent<EquipmentVerb>>>(OnGetRemoveVerbRelayed);
         SubscribeLocalEvent<FleshWormComponent, FleshWormRemoveVerbEvent>(OnRemoveVerb);
+        SubscribeLocalEvent<InventoryComponent, FleshWormSuffocationAlertEvent>(OnSuffocationAlertClick);
+
+        SubscribeLocalEvent<InventoryComponent, ExaminedEvent>(OnWearersExamined);
+        SubscribeLocalEvent<InventoryComponent, HealthBeingExaminedEvent>(OnWearersHealthExamined);
+    }
+
+    private void OnWearersExamined(Entity<InventoryComponent> ent, ref ExaminedEvent args)
+    {
+        if (!args.IsInDetailsRange || !TryGetFaceWorm(ent, out var worm))
+            return;
+
+        args.PushMarkup(Loc.GetString("flesh-worm-wearer-examine", ("ent", worm), ("target", ent)));
+    }
+
+    private void OnWearersHealthExamined(Entity<InventoryComponent> ent, ref HealthBeingExaminedEvent args)
+    {
+        if (!TryGetFaceWorm(ent, out var worm))
+            return;
+
+        args.Message.PushNewline();
+        args.Message.TryAddMarkup(Loc.GetString("flesh-worm-wearer-examine", ("ent", worm), ("target", ent)), out _);
+    }
+
+    private bool TryGetFaceWorm(EntityUid wearer, [NotNullWhen(true)] out EntityUid worm)
+    {
+        worm = default;
+
+        if (!_inventory.TryGetSlotEntity(wearer, "mask", out var maskUid) || maskUid is not { } mask || !HasComp<FleshWormComponent>(mask))
+            return false;
+
+        worm = mask;
+        return true;
     }
 
     private void OnGetRemoveVerbRelayed(Entity<FleshWormComponent> ent, ref InventoryRelayedEvent<GetVerbsEvent<EquipmentVerb>> args)
@@ -47,6 +81,18 @@ public abstract partial class SharedFleshWormSystem : EntitySystem
 
         args.Handled = true;
         StartRemoveDoAfter(args.Performer, ent.Owner, args.Wearer, ent.Comp);
+    }
+
+    private void OnSuffocationAlertClick(Entity<InventoryComponent> ent, ref FleshWormSuffocationAlertEvent args)
+    {
+        if (args.Handled || args.User != ent.Owner)
+            return;
+
+        if (!TryGetFaceWorm(ent, out var worm) || !TryComp<FleshWormComponent>(worm, out var comp))
+            return;
+
+        args.Handled = true;
+        StartRemoveDoAfter(args.User, worm, args.User, comp);
     }
 
     private void AddRemoveVerb(Entity<FleshWormComponent> ent, ref GetVerbsEvent<EquipmentVerb> args)

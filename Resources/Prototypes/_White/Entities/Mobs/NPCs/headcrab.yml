@@ -17,7 +17,7 @@
   - type: GhostRole
     allowSpeech: false
     name: ghost-role-information-headcrab-name
-    description: ghost-role-information-headcrab-description 
+    description: ghost-role-information-headcrab-description
     raffle:
       settings: short
   - type: Sprite
@@ -30,19 +30,19 @@
     thresholds:
       0: Alive
       50: Dead
-  - type: Headcrab
+  - type: DoAfter
+  - type: FleshWorm
     paralyzeTime: 3
-    chancePounce: 25
+    chansePounce: 25
+    removeDelay: 3
+    selfRemoveDelayMultiplier: 1.5
+    selfRemoveStaminaCost: 20
     damage:
       types:
         Piercing: 5
-    healOnEquipped:
-      types:
-        Brute: -5.25
-        Burn: -5.25
-        Airloss: -10.25
-        Toxin: -5.25
-    jumpAction: ActionHeadcrabJump
+    headTraumaChance: 0.25
+    traumaSeverity: 12
+    actionWormJump: ActionHeadcrabJump
   - type: DamageStateVisuals
     states:
       Alive:
@@ -66,9 +66,14 @@
     size: Large
   - type: Clothing
     quickEquip: false
+    equippedState: equipped-MASK
+    clothingVisuals:
+      mask:
+        - state: equipped-MASK
+    unequipDelay: 3
+    stripDelay: 3
     slots:
       - MASK
-      - HEAD
   - type: Physics
     bodyType: KinematicController
   - type: MeleeWeapon
@@ -89,7 +94,7 @@
       - Zombie
   - type: HTN
     rootTask:
-      task: SimpleHostileCompound
+      task: FleshWormCompound
   - type: MovementSpeedModifier
     baseWalkSpeed: 2.9
     baseSprintSpeed: 3.9
@@ -149,7 +154,7 @@
     sprite: _White/Mobs/Animals/headcrab_poison.rsi
   - type: Clothing
     sprite: _White/Mobs/Animals/headcrab_poison.rsi
-  - type: Headcrab
+  - type: FleshWorm
     damage:
       types:
         Poison: 5

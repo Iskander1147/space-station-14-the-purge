@@ -1,9 +1,10 @@
 - type: entity
   name: ГрейТайд
-  parent: BaseMobHuman
+  parent: MobHuman
   suffix: AI
   id: MobPMCGreyTide
   components:
+    - type: PainImmune
     - type: NpcFactionMember
       factions:
         - Syndicate
@@ -15,15 +16,17 @@
     - type: HTN
       rootTask:
         task: SimpleHumanoidHostileCompound
-    - type: RandomHumanoidAppearance
+    - type: RandomHumanoidProfile
       randomizeName: true
+      randomizeHair: true
 
 - type: entity
   name: ГрейТайд
-  parent: BaseMobHuman
+  parent: MobHuman
   suffix: AISuperZloy
   id: MobPMCGreyTideSuperZloy
   components:
+    - type: PainImmune
     - type: NpcFactionMember
       factions:
         - SuperZloy
@@ -35,15 +38,17 @@
     - type: HTN
       rootTask:
         task: SimpleHumanoidHostileCompound
-    - type: RandomHumanoidAppearance
+    - type: RandomHumanoidProfile
       randomizeName: true
+      randomizeHair: true
 
 - type: entity
   name: ГрейТайд
-  parent: BaseMobHuman
+  parent: MobHuman
   suffix: AIMosin
   id: MobPMCGreyTideMosin
   components:
+    - type: PainImmune
     - type: NpcFactionMember
       factions:
         - Syndicate
@@ -55,5 +60,72 @@
     - type: HTN
       rootTask:
         task: SimpleHumanoidHostileCompound
-    - type: RandomHumanoidAppearance
+    - type: RandomHumanoidProfile
       randomizeName: true
+      randomizeHair: true
+
+- type: entity
+  name: ГрейТайд
+  parent: MobHuman
+  suffix: AIRifle
+  id: MobPMCGreyTideRifle
+  components:
+    - type: PainImmune
+    - type: NpcFactionMember
+      factions:
+        - Syndicate
+    - type: Loadout
+      prototypes:
+        - GreyTideAIRifle
+    - type: InputMover
+    - type: MobMover
+    - type: HTN
+      rootTask:
+        task: SimpleHumanoidHostileCompound
+    - type: RandomHumanoidProfile
+      randomizeName: true
+      randomizeHair: true
+
+- type: entity
+  name: ГрейТайд
+  parent: MobHuman
+  suffix: AIShotgun
+  id: MobPMCGreyTideShotgun
+  components:
+    - type: PainImmune
+    - type: NpcFactionMember
+      factions:
+        - Syndicate
+    - type: Loadout
+      prototypes:
+        - GreyTideAIShotgun
+    - type: InputMover
+    - type: MobMover
+    - type: HTN
+      rootTask:
+        task: SimpleHumanoidHostileCompound
+    - type: RandomHumanoidProfile
+      randomizeName: true
+      randomizeHair: true
+
+- type: entity
+  name: ГрейТайд
+  parent: MobHuman
+  suffix: AIDeagle
+  id: MobPMCGreyTideDeagle
+  components:
+    - type: PainImmune
+    - type: NpcFactionMember
+      factions:
+        - Syndicate
+    - type: Loadout
+      prototypes:
+        - GreyTideAIDeagle
+    - type: InputMover
+    - type: MobMover
+    - type: HTN
+      rootTask:
+        task: SimpleHumanoidHostileCompound
+    - type: RandomHumanoidProfile
+      randomizeName: true
+      randomizeHair: true

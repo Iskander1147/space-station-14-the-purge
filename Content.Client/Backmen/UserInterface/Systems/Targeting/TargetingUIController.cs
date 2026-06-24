@@ -74,10 +74,12 @@ public sealed partial class TargetingUIController : UIController, IOnStateEntere
 
     public void CycleTarget(TargetBodyPart bodyPart)
     {
+        bodyPart = SharedTargetingSystem.NormalizeTarget(bodyPart);
+
         if (_playerManager.LocalEntity is not { } user
             || _entManager.GetComponent<TargetingComponent>(user) is not { } targetingComponent
             || TargetingControl == null
-            || bodyPart == targetingComponent.Target)
+            || bodyPart == SharedTargetingSystem.NormalizeTarget(targetingComponent.Target))
             return;
 
         var player = _entManager.GetNetEntity(user);
@@ -88,8 +90,8 @@ public sealed partial class TargetingUIController : UIController, IOnStateEntere
 
     public void UpdatePartStatusControl(TargetingComponent component)
     {
-        if (TargetingControl != null && _targetingComponent != null)
-            TargetingControl.SetTextures(_targetingComponent.BodyStatus);
+        if (TargetingControl != null)
+            TargetingControl.SetTextures(component.BodyStatus);
     }
 
     public Texture GetTexture(SpriteSpecifier specifier)

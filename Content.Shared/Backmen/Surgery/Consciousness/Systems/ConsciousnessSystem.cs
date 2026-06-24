@@ -1,13 +1,16 @@
-﻿using System.Linq;
+using System.Linq;
 using Content.Shared.Backmen.Surgery.Consciousness.Components;
+using Content.Shared.Backmen.Surgery.Pain.Components;
 using Content.Shared.Backmen.Surgery.Pain.Systems;
 using Content.Shared.Backmen.Surgery.Wounds.Systems;
 using Content.Shared.Body.Systems;
+using Content.Shared.Backmen.Body.Systems;
 using Content.Shared.FixedPoint;
 using Content.Shared.Mobs;
 using Content.Shared.Mobs.Components;
 using Content.Shared.Mobs.Systems;
 using Content.Shared.Zombies;
+using Robust.Shared.GameStates;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 using Robust.Shared.Timing;
@@ -21,7 +24,7 @@ public abstract partial class ConsciousnessSystem : EntitySystem
     [Dependency] protected IRobustRandom Random = default!;
     [Dependency] protected IPrototypeManager Proto = default!;
 
-    [Dependency] protected SharedBodySystem Body = default!;
+    [Dependency] protected BkmBodySharedSystem Body = default!;
 
     [Dependency] protected PainSystem Pain = default!;
     [Dependency] protected WoundSystem Wound = default!;
@@ -31,14 +34,43 @@ public abstract partial class ConsciousnessSystem : EntitySystem
 
     [Dependency] protected EntityQuery<ConsciousnessComponent> ConsciousnessQuery = default!;
     [Dependency] protected EntityQuery<MobStateComponent> MobStateQuery = default!;
+    [Dependency] protected EntityQuery<PainImmuneComponent> PainImmuneQuery = default!;
 
     public override void Initialize()
     {
         base.Initialize();
 
-        InitNet();
-
         SubscribeLocalEvent<ConsciousnessComponent, MobStateChangedEvent>(OnRelayState);
+        SubscribeLocalEvent<ConsciousnessComponent, AfterAutoHandleStateEvent>(OnAfterAutoHandleState);
+    }
+
+    private void OnAfterAutoHandleState(Entity<ConsciousnessComponent> ent, ref AfterAutoHandleStateEvent args)
+    {
+        SanitizeConsciousnessDictionaries(ent.Comp);
+    }
+
+    private void SanitizeConsciousnessDictionaries(ConsciousnessComponent component)
+    {
+        if (component.NerveSystem != null && TerminatingOrDeleted(component.NerveSystem.Value.Owner))
+            component.NerveSystem = null;
+
+        foreach (var key in component.Modifiers.Keys.ToArray())
+        {
+            if (TerminatingOrDeleted(key.Item1))
+                component.Modifiers.Remove(key);
+        }
+
+        foreach (var key in component.Multipliers.Keys.ToArray())
+        {
+            if (TerminatingOrDeleted(key.Item1))
+                component.Multipliers.Remove(key);
+        }
+
+        foreach (var (id, (entity, _, _)) in component.RequiredConsciousnessParts.ToArray())
+        {
+            if (entity != null && TerminatingOrDeleted(entity.Value))
+                component.RequiredConsciousnessParts.Remove(id);
+        }
     }
 
     protected virtual void OnMobStateChanged(Entity<ConsciousnessComponent> consciousness,
@@ -76,7 +108,7 @@ public abstract partial class ConsciousnessSystem : EntitySystem
         uid.Comp.RawConsciousness = newConsciousness;
 
         CheckConscious(uid);
-        Dirty(uid);
+        DirtyField(uid, uid.Comp, nameof(ConsciousnessComponent.RawConsciousness));
     }
 
     protected void UpdateConsciousnessMultipliers(Entity<ConsciousnessComponent?> uid)
@@ -90,7 +122,7 @@ public abstract partial class ConsciousnessSystem : EntitySystem
             (current, multiplier) => current + multiplier.Value.Change) / uid.Comp.Multipliers.Count;
 
         CheckConscious(uid);
-        Dirty(uid);
+        DirtyField(uid, uid.Comp, nameof(ConsciousnessComponent.Multiplier));
     }
 
     /// <summary>
@@ -107,7 +139,7 @@ public abstract partial class ConsciousnessSystem : EntitySystem
             return;
 
         target.Comp.IsConscious = isConscious;
-        Dirty(target);
+        DirtyField(target, target.Comp, nameof(ConsciousnessComponent.IsConscious));
     }
 
     protected void UpdateMobState(
@@ -122,23 +154,24 @@ public abstract partial class ConsciousnessSystem : EntitySystem
         if (HasComp<ZombieComponent>(target.Owner))
             return;
 
+        var inPainCrit = !PainImmuneQuery.HasComp(target)
+            && TryGetNerveSystem(target, out var nerveSys)
+            && (nerveSys.Value.Comp.Pain >= nerveSys.Value.Comp.SoftPainCap
+                || nerveSys.Value.Comp.ForcePainCrit);
+
         var newMobState = MobState.Alive;
-        if (TryGetNerveSystem(target, out var nerveSys))
-        {
-            var comp = nerveSys.Value.Comp;
-            if (comp.Pain >= comp.SoftPainCap || comp.ForcePainCrit)
-                newMobState = MobState.SoftCritical;
-        }
+        if (inPainCrit)
+            newMobState = MobState.SoftCritical;
 
         if (!target.Comp1.ForceConscious)
         {
-            if (!target.Comp1.IsConscious)
+            if (target.Comp1.ForceUnconscious)
+                newMobState = MobState.Critical;
+
+            if (!target.Comp1.IsConscious && !inPainCrit)
                 newMobState = MobState.Critical;
 
             if (target.Comp1.PassedOut)
-                newMobState = MobState.Critical;
-
-            if (target.Comp1.ForceUnconscious)
                 newMobState = MobState.Critical;
 
             if (target.Comp1.Consciousness <= 0)
@@ -149,7 +182,7 @@ public abstract partial class ConsciousnessSystem : EntitySystem
             newMobState = MobState.Dead;
 
         MobStateSys.ChangeMobState(target, newMobState, target);
-        MobThresholds.VerifyThresholds(target, mobState: target);
+        MobThresholds.VerifyThresholds(target, mobState: target.Comp2);
     }
 
     protected void CheckRequiredParts(
@@ -166,7 +199,7 @@ public abstract partial class ConsciousnessSystem : EntitySystem
             if (forcesDeath)
             {
                 bodyId.Comp.ForceDead = true;
-                Dirty(bodyId);
+                DirtyField(bodyId, bodyId.Comp, nameof(ConsciousnessComponent.ForceDead));
 
                 alive = false;
                 break;
@@ -180,7 +213,9 @@ public abstract partial class ConsciousnessSystem : EntitySystem
             bodyId.Comp.ForceDead = false;
             bodyId.Comp.ForceUnconscious = !conscious;
 
-            Dirty(bodyId);
+            DirtyFields(bodyId, bodyId.Comp, null,
+                nameof(ConsciousnessComponent.ForceDead),
+                nameof(ConsciousnessComponent.ForceUnconscious));
         }
 
         CheckConscious(bodyId.AsNullable());

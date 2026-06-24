@@ -20,8 +20,8 @@ public sealed partial class TargetingSystem : SharedTargetingSystem
         if (!TryComp<TargetingComponent>(GetEntity(message.Uid), out var target))
             return;
 
-        target.Target = message.BodyPart;
-        Dirty(GetEntity(message.Uid), target);
+        target.Target = SharedTargetingSystem.NormalizeTarget(message.BodyPart);
+        DirtyField(GetEntity(message.Uid), target, nameof(TargetingComponent.Target));
     }
 
     private void OnMobStateChange(EntityUid uid, TargetingComponent component, MobStateChangedEvent args)
@@ -46,7 +46,7 @@ public sealed partial class TargetingSystem : SharedTargetingSystem
         if (!changed)
             return;
 
-        Dirty(uid, component);
+        DirtyField(uid, component, nameof(TargetingComponent.BodyStatus));
         RaiseNetworkEvent(new TargetIntegrityChangeEvent(GetNetEntity(uid)), uid);
     }
 }

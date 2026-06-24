@@ -12,8 +12,16 @@ namespace Content.Server.NPC.HTN.PrimitiveTasks.Operators.Interactions;
 public sealed partial class ClearIngestionBlockersOperator : HTNOperator
 {
     [Dependency] private IEntityManager _entManager = default!;
+
+    /// <summary>
+    /// Blackboard key for the entity to clear blockers on. Defaults to the NPC owner (e.g. before eating).
+    /// </summary>
+    [DataField("targetKey")]
+    public string? TargetKey;
+
     private InventorySystem _inventory = default!;
     private MaskSystem _mask = default!;
+    private ToggleableClothingSystem _toggleableClothing = default!;
 
     private static readonly SlotFlags MouthSlots = SlotFlags.HEAD | SlotFlags.MASK;
 
@@ -22,50 +30,64 @@ public sealed partial class ClearIngestionBlockersOperator : HTNOperator
         base.Initialize(sysManager);
         _inventory = sysManager.GetEntitySystem<InventorySystem>();
         _mask = sysManager.GetEntitySystem<MaskSystem>();
+        _toggleableClothing = sysManager.GetEntitySystem<ToggleableClothingSystem>();
     }
 
     public override HTNOperatorStatus Update(NPCBlackboard blackboard, float frameTime)
     {
-        var owner = blackboard.GetValue<EntityUid>(NPCBlackboard.Owner);
+        var subject = TargetKey != null && blackboard.TryGetValue<EntityUid>(TargetKey, out var target, _entManager)
+            ? target
+            : blackboard.GetValue<EntityUid>(NPCBlackboard.Owner);
 
-        if (!IsMouthBlocked(owner))
+        if (!IsMouthBlocked(subject))
             return HTNOperatorStatus.Finished;
 
-        TryClearMask(owner);
+        TryClearFaceProtection(subject);
 
-        if (!IsMouthBlocked(owner))
-            return HTNOperatorStatus.Finished;
-
-        TryUnequipBlocker(owner, "head");
-
-        return IsMouthBlocked(owner) ? HTNOperatorStatus.Failed : HTNOperatorStatus.Finished;
+        return IsMouthBlocked(subject) ? HTNOperatorStatus.Failed : HTNOperatorStatus.Finished;
     }
 
     private bool IsMouthBlocked(EntityUid uid)
     {
+        if (!_entManager.TryGetComponent<InventoryComponent>(uid, out var inventory))
+            return false;
+
         var attempt = new IngestionAttemptEvent(MouthSlots);
-        _entManager.EventBus.RaiseLocalEvent(uid, ref attempt);
+        _inventory.RelayEvent((uid, inventory), ref attempt);
         return attempt.Cancelled;
     }
 
-    private void TryClearMask(EntityUid owner)
+    private void TryClearFaceProtection(EntityUid owner)
+    {
+        TryPullDownMask(owner);
+
+        if (IsMouthBlocked(owner))
+            TryUnequipBlocker(owner, "head");
+
+        if (IsMouthBlocked(owner))
+            TryUnequipBlocker(owner, "mask");
+    }
+
+    private void TryPullDownMask(EntityUid owner)
     {
         if (!_inventory.TryGetSlotEntity(owner, "mask", out var maskUid) || maskUid is not { } mask)
             return;
 
-        if (_entManager.TryGetComponent<MaskComponent>(mask, out var maskComp)
-            && maskComp.IsToggleable
-            && !maskComp.IsToggled)
-        {
-            _mask.SetToggled(mask, true);
+        if (!_entManager.TryGetComponent<MaskComponent>(mask, out var maskComp) || maskComp.IsToggled)
             return;
-        }
 
-        TryUnequipBlocker(owner, "mask");
+        _mask.SetToggled(mask, true);
+
+        // Non-toggleable masks still have MaskComponent but ignore SetToggled without force.
+        if (_entManager.TryGetComponent<MaskComponent>(mask, out maskComp) && !maskComp.IsToggled)
+            _mask.SetToggled(mask, true, force: true);
     }
 
     private void TryUnequipBlocker(EntityUid owner, string slot)
     {
+        if (_toggleableClothing.TryStowAttached(owner, slot))
+            return;
+
         if (!_inventory.TryGetSlotEntity(owner, slot, out var itemUid) || itemUid is not { } item)
             return;
 

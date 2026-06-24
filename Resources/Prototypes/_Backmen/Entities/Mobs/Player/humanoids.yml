@@ -12,7 +12,7 @@
   id: HumanCannedClown
   name: Canned clown
   components:
-    - type: RandomHumanoidAppearance
+    - type: RandomHumanoidProfile
       randomizeName: false
     - type: Icon
       sprite: Markers/jobs.rsi
@@ -52,7 +52,7 @@
       prototypes: [FugitiveStartingGear]
     - type: Fugitive
     - type: FugitiveCountdown
-    - type: RandomHumanoidAppearance
+    - type: RandomHumanoidProfile
 
 # Wizard
 - type: entity
@@ -63,6 +63,7 @@
   parent: MobHuman
   components:
     - type: SpellbookUser
+    - type: PainImmune
     - type: GhostRole
       name: Urist McWizard
       description: |
@@ -93,7 +94,7 @@
       factions:
         - SimpleHostile
     - type: BibleUser
-    # - type: RandomHumanoidAppearance # Removes random names :(
+    # - type: RandomHumanoidProfile # Removes random names :(
 
 - type: entity
   name: Urist McWizard
@@ -142,6 +143,7 @@
   parent: MobHuman
   components:
     - type: AutoPsi # backmen: SuperPsi
+    - type: PainImmune
     - type: GhostTakeoverAvailable
     - type: GhostRole
       name: Urist McNars
@@ -171,7 +173,7 @@
     - type: BibleUser
     - type: Psionic
       removable: false
-    - type: RandomHumanoidAppearance # Removes random names :(
+    - type: RandomHumanoidProfile # Removes random names :(
       randomizeName: false
     - type: DispelPower
     - type: MassSleepPower

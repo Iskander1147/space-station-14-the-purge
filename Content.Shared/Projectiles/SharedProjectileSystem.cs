@@ -5,9 +5,9 @@ using Content.Shared.Hands.EntitySystems;
 using Content.Shared.Interaction;
 using Content.Shared.Inventory;
 using Content.Shared.Throwing;
+using Content.Shared._Mono; // backmen: shuttle-gunnery
 using Robust.Shared.Audio.Systems;
 using Robust.Shared.Map;
-using Robust.Shared.Network;
 using Robust.Shared.Physics;
 using Robust.Shared.Physics.Components;
 using Robust.Shared.Physics.Events;
@@ -39,7 +39,19 @@ public abstract partial class SharedProjectileSystem : EntitySystem
         SubscribeLocalEvent<EmbeddableProjectileComponent, ComponentShutdown>(OnEmbeddableCompShutdown);
 
         SubscribeLocalEvent<EmbeddedContainerComponent, EntityTerminatingEvent>(OnEmbeddableTermination);
+
+        // start-backmen: shuttle-gunnery
+        SubscribeLocalEvent<ProjectileGridPhaseComponent, ComponentStartup>(OnProjectileGridPhaseStartup);
+        // end-backmen: shuttle-gunnery
     }
+
+    // start-backmen: shuttle-gunnery
+    private void OnProjectileGridPhaseStartup(EntityUid uid, ProjectileGridPhaseComponent component, ComponentStartup args)
+    {
+        var xform = Transform(uid);
+        component.SourceGrid = xform.GridUid;
+    }
+    // end-backmen: shuttle-gunnery
 
     private void OnEmbedActivate(Entity<EmbeddableProjectileComponent> embeddable, ref ActivateInWorldEvent args)
     {
@@ -204,7 +216,21 @@ public abstract partial class SharedProjectileSystem : EntitySystem
         if (component.IgnoreShooter && (args.OtherEntity == component.Shooter || args.OtherEntity == component.Weapon))
         {
             args.Cancelled = true;
+            return;
         }
+
+        // start-backmen: shuttle-gunnery
+        if (TryComp<ProjectileGridPhaseComponent>(uid, out var phaseComp))
+        {
+            var targetXform = Transform(args.OtherEntity);
+            if (phaseComp.SourceGrid.HasValue &&
+                targetXform.GridUid.HasValue &&
+                phaseComp.SourceGrid == targetXform.GridUid)
+            {
+                args.Cancelled = true;
+            }
+        }
+        // end-backmen: shuttle-gunnery
     }
 
     public void SetShooter(EntityUid id, ProjectileComponent component, EntityUid shooterId)

@@ -1,14 +1,13 @@
 using System.Linq;
-using Content.Server.Body.Components;
 using Content.Server.DoAfter;
 using Content.Server.Popups;
 using Content.Shared.Backmen.CCVar;
+using Content.Shared.Backmen.Damage;
 using Content.Shared.Backmen.Surgery.Body.Events;
 using Content.Shared.Backmen.Surgery.Body.Organs;
 using Content.Shared.Backmen.Surgery.Consciousness;
 using Content.Shared.Backmen.Surgery.Consciousness.Components;
 using Content.Shared.Backmen.Surgery.Consciousness.Systems;
-using Content.Shared.Backmen.Surgery.Pain;
 using Content.Shared.Backmen.Surgery.Pain.Components;
 using Content.Shared.Backmen.Surgery.Pain.Systems;
 using Content.Shared.Backmen.Surgery.Traumas;
@@ -18,7 +17,6 @@ using Content.Shared.Backmen.Targeting;
 using Content.Shared.Body.Part;
 using Content.Shared.Body;
 using Content.Shared.Body.Events;
-using Content.Shared.Body.Systems;
 using Content.Shared.Backmen.Body.Systems;
 using Content.Shared.Damage;
 using Content.Shared.Damage.Components;
@@ -54,6 +52,7 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
     [Dependency] private DamageableSystem _damageable = default!;
     [Dependency] private StandingStateSystem _standing = default!;
     [Dependency] private MobThresholdSystem _mobThresholds = default!;
+    [Dependency] private BackmenDamageModelExclusivitySystem _backmenDamageExclusivity = default!;
 
 
     private float _cprTraumaChance = 0.1f;
@@ -66,7 +65,7 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
 
         SubscribeLocalEvent<ConsciousnessComponent, ComponentInit>(OnConsciousnessInit);
         SubscribeLocalEvent<ConsciousnessComponent, MapInitEvent>(OnConsciousnessMapInit);
-        SubscribeLocalEvent<ConsciousnessComponent, DamageableWoundApplyEvent>(OnConsciousnessDamaged);
+        SubscribeLocalEvent<ConsciousnessComponent, DamageDealtEvent>(OnConsciousnessDamageDealt);
 
         SubscribeLocalEvent<ConsciousnessComponent, InteractHandEvent>(OnConsciousnessInteract);
         SubscribeLocalEvent<ConsciousnessComponent, CprDoAfterEvent>(OnCprDoAfter);
@@ -98,14 +97,11 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
 
     private const string NerveSystemIdentifier = "nerveSystem";
 
-    private void OnConsciousnessDamaged(
-        EntityUid uid,
-        ConsciousnessComponent component,
-        ref DamageableWoundApplyEvent args)
+    private void OnConsciousnessDamageDealt(
+        Entity<ConsciousnessComponent> consciousness,
+        ref DamageDealtEvent args)
     {
-        if (args.Handled)
-            return;
-
+        var (uid, component) = consciousness;
         var actuallyInducedDamage = new DamageSpecifier(args.Damage);
         switch (args.TargetPart)
         {
@@ -128,7 +124,7 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
                                 damageGroup?.ID))
                         {
                             actuallyInducedDamage.DamageDict[damagePair.Key] =
-                                TryApplyAsphyxiationChange((uid, component), damagePair);
+                                TryApplyAsphyxiationChange(consciousness, damagePair);
                             continue;
                         }
 
@@ -147,10 +143,17 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
 
                         actuallyInducedDamage.DamageDict[damagePair.Key] = woundHealed != 0
                             ? woundHealed
-                            : TryApplyAsphyxiationChange((uid, component), damagePair);
+                            : TryApplyAsphyxiationChange(consciousness, damagePair);
                     }
                     else
                     {
+                        if (damagePair.Key == AsphyxiationDamageType)
+                        {
+                            actuallyInducedDamage.DamageDict[damagePair.Key] =
+                                TryApplyAsphyxiationChange(consciousness, damagePair);
+                            continue;
+                        }
+
                         var bodyParts = Body.GetWoundableTargets(uid).ToList();
 
                         actuallyInducedDamage.DamageDict[damagePair.Key] = 0;
@@ -201,13 +204,36 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
                 RaiseLocalEvent(chosenTarget, ref beforePart);
 
                 if (!beforePart.Cancelled)
+                {
                     actuallyInducedDamage = Wound.GetWoundsChanged(chosenTarget, args.Origin, args.Damage);
+
+                    foreach (var damagePair in args.Damage.DamageDict)
+                    {
+                        if (damagePair.Key != AsphyxiationDamageType)
+                            continue;
+
+                        if (damagePair.Value > 0
+                            && actuallyInducedDamage.DamageDict.GetValueOrDefault(damagePair.Key) != 0)
+                            continue;
+
+                        actuallyInducedDamage.DamageDict[damagePair.Key] =
+                            TryApplyAsphyxiationChange(consciousness, damagePair);
+                    }
+                }
+
                 break;
             }
         }
 
-        args.Damage = actuallyInducedDamage;
-        args.Handled = true;
+        if (!TryComp<DamageableComponent>(uid, out var damageable))
+            return;
+
+        _damageable.ApplyDamageToDamageable(
+            (uid, damageable),
+            actuallyInducedDamage,
+            component.DamageContainer,
+            args.Origin,
+            args.InterruptsDoAfters);
     }
 
     protected override void OnMobStateChanged(Entity<ConsciousnessComponent> consciousness, ref MobStateChangedEvent args)
@@ -253,6 +279,12 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
             return false;
         }
 
+        if (!MobStateSys.IsCritical(consciousness, mobState))
+        {
+            _popup.PopupPredicted(Loc.GetString("cpr-cant-perform-not-crit"), consciousness, user, PopupType.Medium);
+            return false;
+        }
+
         return true;
     }
 
@@ -264,24 +296,26 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
         if (!CanPerformCpr(consciousness, args.User))
             return;
 
+        if (!_doAfter.TryStartDoAfter(new DoAfterArgs(EntityManager,
+                args.User,
+                consciousness.Comp.CprDoAfterDuration,
+                new CprDoAfterEvent(),
+                args.Target,
+                args.Target)
+            {
+                NeedHand = true,
+                BreakOnMove = true,
+                BreakOnHandChange = true,
+                CancelDuplicate = true,
+                BlockDuplicate = true,
+            }))
+            return;
+
+        args.Handled = true;
+
         _popup.PopupEntity(
             Loc.GetString("user-began-cpr", ("user", args.User), ("target", args.Target)),
             args.Target);
-
-        args.Handled = _doAfter.TryStartDoAfter(new
-            DoAfterArgs(EntityManager,
-            args.User,
-            consciousness.Comp.CprDoAfterDuration,
-            new CprDoAfterEvent(),
-            args.Target,
-            args.Target)
-        {
-            NeedHand = true,
-            BreakOnMove = true,
-            BreakOnHandChange = true,
-            CancelDuplicate = true,
-            BlockDuplicate = true,
-        });
     }
 
     private void OnCprDoAfter(Entity<ConsciousnessComponent> consciousness, ref CprDoAfterEvent args)
@@ -538,7 +572,7 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
     /// <returns>Damage applied in the same convention as <see cref="DamageSpecifier"/> (negative = heal).</returns>
     private FixedPoint2 TryApplyAsphyxiationChange(
         Entity<ConsciousnessComponent> consciousness,
-        KeyValuePair<string, FixedPoint2> damagePair)
+        KeyValuePair<ProtoId<DamageTypePrototype>, FixedPoint2> damagePair)
     {
         if (damagePair.Key != AsphyxiationDamageType)
             return FixedPoint2.Zero;
@@ -668,6 +702,8 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
 
     private void OnConsciousnessMapInit(Entity<ConsciousnessComponent> uid, ref MapInitEvent args)
     {
+        _backmenDamageExclusivity.RemoveInjurableIfPresent(uid);
+
         SyncConsciousnessFromMobThresholds(uid, uid.Comp);
         ApplyInitialPrototypeDamage(uid);
         CheckConscious(uid.AsNullable());
@@ -684,17 +720,17 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
     /// </remarks>
     private void ApplyInitialPrototypeDamage(EntityUid uid)
     {
-        if (!TryComp<DamageableComponent>(uid, out var damageable) || damageable.TotalDamage <= 0)
+        if (!TryComp<DamageableComponent>(uid, out var damageable) || _damageable.GetTotalDamage((uid, damageable)) <= 0)
             return;
 
         if (ConsciousnessQuery.TryComp(uid, out var consciousness))
         {
-            foreach (var (type, amount) in damageable.Damage.DamageDict)
+            foreach (var (type, amount) in _damageable.GetAllDamage((uid, damageable)).DamageDict)
             {
                 if (amount <= 0)
                     continue;
 
-                TryApplyAsphyxiationChange((uid, consciousness), new KeyValuePair<string, FixedPoint2>(type, amount));
+                TryApplyAsphyxiationChange((uid, consciousness), new KeyValuePair<ProtoId<DamageTypePrototype>, FixedPoint2>(type, amount));
             }
         }
 
@@ -980,11 +1016,12 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
             return null;
 
         var painCauses = new Dictionary<string, float>();
+        var hasNervePainBreakdown = TryGetNerveSystem(target, out var nerveSys);
 
-        // Get pain modifiers from nerve system (physical pain from wounds)
-        if (TryGetNerveSystem(target, out var nerveSys))
+        // Get pain modifiers from nerve system (physical pain from wounds, starving, etc.)
+        if (hasNervePainBreakdown)
         {
-            foreach (var ((nerveUid, identifier), modifier) in nerveSys.Value.Comp.Modifiers)
+            foreach (var ((nerveUid, identifier), modifier) in nerveSys!.Value.Comp.Modifiers)
             {
                 // Apply modifiers to get actual pain value (with multipliers)
                 var actualPain = _pain.ApplyModifiersToPain(
@@ -1011,6 +1048,10 @@ public sealed partial class ServerConsciousnessSystem : ConsciousnessSystem
         foreach (var ((modifierOwner, identifier), modifier) in target.Comp.Modifiers)
         {
             if (modifier.Type != ConsciousnessModType.Pain)
+                continue;
+
+            // UpdateNerveSystemPain mirrors total nerve pain here; per-cause breakdown is on the nerve system.
+            if (hasNervePainBreakdown && identifier == "WoundPain")
                 continue;
 
             // Only include negative modifiers (they reduce consciousness, which is what we want to show as pain)

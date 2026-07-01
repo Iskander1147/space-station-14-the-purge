@@ -12,7 +12,7 @@ health-analyzer-window-entity-blood-level-text = Уровень крови:
 health-analyzer-window-entity-damage-total-text = Общие повреждения:
 health-analyzer-window-damage-group-text = { $damageGroup }: { $amount }
 health-analyzer-window-damage-type-text = { $damageType }: { $amount }
-health-analyzer-window-entity-unrevivable-text = [color=red]Обнаружено уникальное строение тела! Пациент не может быть реанимирован стандартными средствами![/color]
+health-analyzer-window-entity-unrevivable-text = [color=yellow]Обнаружено уникальное строение тела! Пациент не может быть реанимирован стандартными средствами![/color]
 health-analyzer-window-entity-bleeding-text = У пациента кровотечение!
 health-analyzer-window-entity-diseased-text = [color=orange]Пациент заражён болезнью![/color]
 health-analyzer-window-entity-pain-immune-text = [color=yellow]Похоже, пациент не чувствует боли.[/color]
@@ -22,7 +22,6 @@ health-analyzer-window-scan-mode-text = Режим сканирования:
 health-analyzer-window-scan-mode-active = АКТИВЕН
 health-analyzer-window-scan-mode-inactive = НЕАКТИВЕН
 health-analyzer-window-malnutrition = Тяжёлое недоедание
-
 health-analyzer-window-pain-causes-text = Причины боли:
 health-analyzer-window-tab-nerve-system-pain = Нервная система
 health-analyzer-window-tab-body-pain-causes = Причины боли тела
@@ -40,7 +39,12 @@ health-analyzer-window-pain-cause-death-threshold = Состояние близ�
 health-analyzer-window-pain-cause-suicide = Самоповреждение
 # backmen: organ-damage
 health-analyzer-window-pain-cause-organ-damage = Повреждение органов
-
+health-analyzer-window-pain-cause-starving = Голодание
+# start-backmen: analyzer-satiation
+health-analyzer-window-patient-starving = Пациента мучает голод
+health-analyzer-window-patient-peckish = Пациент голоден
+health-analyzer-window-patient-parched = Пациента мучает жажда
+health-analyzer-window-patient-thirsty = Пациент испытывает жажду
+# end-backmen: analyzer-satiation
 health-analyzer-window-pain-help-button = Помощь
-
 health-analyzer-popup-scan-target = { CAPITALIZE($user) } пытается просканировать вас!

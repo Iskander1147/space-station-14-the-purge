@@ -1,4 +1,3 @@
-﻿using Content.Server.Atmos.Components;
 using Content.Server.Atmos.EntitySystems;
 using Content.Server.Backmen.Psionics.Glimmer;
 using Content.Server.Backmen.StationEvents.Components;
@@ -8,7 +7,6 @@ using Content.Server.Power.EntitySystems;
 using Content.Server.StationEvents.Events;
 using Content.Shared.Atmos.Components;
 using Content.Shared.Backmen.Abilities.Psionics;
-using Content.Shared.Backmen.Psionics.Components;
 using Content.Shared.Backmen.Psionics.Glimmer;
 using Content.Shared.Construction.EntitySystems;
 using Content.Shared.Damage;
@@ -43,7 +41,6 @@ internal sealed partial class NoosphericFryRule : StationEventSystem<NoosphericF
     [Dependency] private PowerReceiverSystem _powerReceiverSystem = default!;
     [Dependency] private SharedTransformSystem _transformSystem = default!;
     [Dependency] private MapSystem _mapSystem = default!;
-    [Dependency] private Shared.StatusEffectNew.StatusEffectsSystem _statusEffects = default!;
 
     private static readonly SoundSpecifier BurnSound = new SoundPathSpecifier("/Audio/Effects/lightburn.ogg");
 
@@ -53,13 +50,10 @@ internal sealed partial class NoosphericFryRule : StationEventSystem<NoosphericF
 
         List<(EntityUid wearer, Entity<TinfoilHatComponent> worn)> psionicList = new();
 
-        var query = EntityQueryEnumerator<PotentialPsionicComponent, MobStateComponent>();
-        while (query.MoveNext(out var psion, out _, out var mobState))
+        var query = EntityQueryEnumerator<MobStateComponent>();
+        while (query.MoveNext(out var psion, out var mobState))
         {
-            if(!_statusEffects.HasEffectComp<PsionicInsulationComponent>(psion))
-                continue;
-
-            if (_mobStateSystem.IsIncapacitated(psion,mobState))
+            if (_mobStateSystem.IsIncapacitated(psion, mobState))
                 continue;
 
             if (!_inventorySystem.TryGetSlotEntity(psion, "head", out var headItem))

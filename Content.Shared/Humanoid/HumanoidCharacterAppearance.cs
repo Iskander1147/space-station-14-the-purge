@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Numerics;
 using Content.Shared.Body;
 using Content.Shared.Humanoid.Markings;
@@ -166,7 +166,7 @@ public sealed partial class HumanoidCharacterAppearance : IEquatable<HumanoidCha
         return new(color.RByte, color.GByte, color.BByte);
     }
 
-    public static HumanoidCharacterAppearance EnsureValid(HumanoidCharacterAppearance appearance, ProtoId<SpeciesPrototype> species, Sex sex)
+    public static HumanoidCharacterAppearance EnsureValid(HumanoidCharacterAppearance appearance, ProtoId<SpeciesPrototype> species, Sex sex, IReadOnlySet<string>? allowedSponsorMarkings = null)
     {
         var eyeColor = ClampColor(appearance.EyeColor);
 
@@ -196,13 +196,13 @@ public sealed partial class HumanoidCharacterAppearance : IEquatable<HumanoidCha
                     continue;
                 }
 
-                var actualMarkings = appearance.Markings.GetValueOrDefault(organ)?.ShallowClone()
-                    ?? new Dictionary<HumanoidVisualLayers, List<Marking>>();
+                var actualMarkings = appearance.Markings.GetValueOrDefault(organ)?.ShallowClone() ?? [];
 
                 markingManager.EnsureValidColors(actualMarkings);
                 markingManager.EnsureValidGroupAndSex(actualMarkings, organData.Value.Group, sex);
                 markingManager.EnsureValidLayers(actualMarkings, organData.Value.Layers);
                 markingManager.EnsureValidLimits(actualMarkings, organData.Value.Group, organData.Value.Layers, skinColor, eyeColor);
+                markingManager.EnsureValidSponsor(actualMarkings, allowedSponsorMarkings); // backmen: sponsor-markings
 
                 validatedMarkings[organ] = actualMarkings;
             }

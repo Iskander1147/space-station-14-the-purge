@@ -5,8 +5,20 @@
   - type: Sprite
     layers:
     - state: purple
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-purple
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-purple
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -53,8 +65,20 @@
   - type: Sprite
     layers:
     - state: darkblue
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-darkblue
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-darkblue
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -102,8 +126,20 @@
   - type: Sprite
     layers:
     - state: h2
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-h2
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-h2
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -152,8 +188,20 @@
   - type: Sprite
     layers:
     - state: brown
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-brown
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-brown
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -203,8 +251,20 @@
   - type: Sprite
     layers:
     - state: healium
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-healium
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-healium
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -261,8 +321,20 @@
   - type: Sprite
     layers:
     - state: nob
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-nob
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-nob
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -319,8 +391,20 @@
   - type: Sprite
     layers:
     - state: proto_nitrate
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-proto_nitrate
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-proto_nitrate
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -377,8 +461,20 @@
   - type: Sprite
     layers:
     - state: zauker
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-zauker
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-zauker
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -435,8 +531,20 @@
   - type: Sprite
     layers:
     - state: halon
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-halon
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-halon
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -493,8 +601,20 @@
   - type: Sprite
     layers:
     - state: helium
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-helium
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-helium
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen
@@ -551,8 +671,20 @@
   - type: Sprite
     layers:
     - state: antinob
+    - state: paper
+      visible: false
+      map: [ "enum.PaperLabelVisuals.Layer" ]
+    - state: integrity-unshaded-0
+      map: [ "enum.MaxPressureVisualLayers.BaseUnshaded" ]
+      shader: unshaded
+      visible: false
+    - state: mask-antinob
+      map: [ "enum.MaxPressureVisualLayers.Base" ]
+      visible: false
+  - type: MaxPressureVisuals
+    integrityMask: mask-antinob
   - type: GasCanister
-    gasMixture:
+    air:
       volume: 1000
       moles:
       - 0 # oxygen

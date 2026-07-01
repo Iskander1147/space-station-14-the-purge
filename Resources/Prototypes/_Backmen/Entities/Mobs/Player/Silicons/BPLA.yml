@@ -24,6 +24,7 @@
   - type: Reactive
     groups:
       Acidic: [Touch]
+  - type: Sanitized
   - type: Input
     context: "human"
   - type: DamageOnHighSpeedImpact
@@ -34,6 +35,7 @@
       collection: MetalThud
   - type: Clickable
   - type: Damageable
+  - type: Injurable
     damageContainer: Inorganic
   - type: Bloodstream
     bloodReferenceSolution:
@@ -210,9 +212,10 @@
       60: 0.7
       100: 0.5
   - type: Temperature
-    heatDamageThreshold: 5000
     currentTemperature: 310.15
     specificHeat: 42
+  - type: TemperatureDamage
+    heatDamageThreshold: 5000
     heatDamage:
       types:
         Heat : 1 #per second, scales with temperature & other constants

@@ -33,6 +33,7 @@
           False: { visible: false }
   - type: StatusIcon
     bounds: -0.5,-0.5,0.5,0.5
+  - type: JobStatus
   - type: RotationVisuals
     defaultRotation: 90
     horizontalRotation: 90
@@ -124,6 +125,9 @@
     factions:
     - NanoTrasen
   - type: CreamPied
+    sprite:
+      sprite: Effects/creampie.rsi
+      state: creampie_human
   - type: ParcelWrapOverride
     parcelPrototype: WrappedParcelHumanoid
     wrapDelay: 5
@@ -173,11 +177,9 @@
   save: false
   components:
   - type: Hunger
-    # start-backmen: hunger
-    starvationDamage:
-      types:
-        Cold: 1
-    # end-backmen: hunger
+    # start-backmen: hunger-pain
+    baseDecayRate: 0.04166666665
+    # end-backmen: hunger-pain
   - type: Thirst
   - type: Mood # backmen: mood
   - type: Barotrauma
@@ -188,17 +190,20 @@
   - type: PassiveDamage
     allowedStates:
     - Alive
-    damageCap: 20
     damage:
       types:
         Heat: -0.07
-      groups:
-        Brute: -0.07
+        Blunt: -0.0175
+        Slash: -0.0175
+        Piercing: -0.0175
+        ArmorPiercing: -0.0175
+    damageCap: 20
   - type: Fingerprint
   - type: Blindable
   - type: Temperature
     currentTemperature: 310.15
     specificHeat: 42
+  - type: TemperatureDamage
     heatDamageThreshold: 325
     coldDamageThreshold: 260
     coldDamage:

@@ -3,10 +3,10 @@ using Content.Server.Backmen.Speech.Components;
 using Content.Shared.Backmen.Language;
 using Content.Shared.Backmen.Language.Components;
 using Content.Shared.Backmen.Language.Systems;
+using Content.Shared.Cloning.Events;
 using Content.Shared.Paper;
 using Content.Shared.Speech;
 using Content.Shared.StatusEffectNew;
-using Robust.Shared.Player;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 using UniversalLanguageSpeakerComponent = Content.Shared.Backmen.Language.Components.UniversalLanguageSpeakerComponent;
@@ -32,6 +32,7 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
         SubscribeLocalEvent<UniversalLanguageSpeakerComponent, ComponentShutdown>(OnUniversalShutdown);
         SubscribeLocalEvent<LanguageAccentComponent, AccentGetEvent>(OnLangAccent);
         SubscribeLocalEvent<LanguageAccentComponent, StatusEffectRelayedEvent<AccentGetEvent>>(OnLangAccentRelayed);
+        SubscribeLocalEvent<LanguageKnowledgeComponent, CloningEvent>(OnCloneLanguageKnowledge);
 
         _languageSpeakerQuery = GetEntityQuery<LanguageSpeakerComponent>();
         _universalLanguageSpeakerQuery = GetEntityQuery<UniversalLanguageSpeakerComponent>();
@@ -263,6 +264,23 @@ public sealed partial class LanguageSystem : SharedLanguageSystem
             component.CurrentLanguage = component.SpokenLanguages.FirstOrDefault(UniversalPrototype);
 
         UpdateEntityLanguages(uid);
+    }
+
+    private void OnCloneLanguageKnowledge(Entity<LanguageKnowledgeComponent> ent, ref CloningEvent args)
+    {
+        if (!args.Settings.Components.Contains(Factory.GetRegistration(ent.Comp.GetType()).Name))
+            return;
+
+        UpdateEntityLanguages(args.CloneUid);
+
+        if (!TryComp<LanguageSpeakerComponent>(ent, out var originalSpeaker)
+            || !TryComp<LanguageSpeakerComponent>(args.CloneUid, out var cloneSpeaker))
+        {
+            return;
+        }
+
+        cloneSpeaker.CurrentLanguage = originalSpeaker.CurrentLanguage;
+        Dirty(args.CloneUid, cloneSpeaker);
     }
 
     #endregion

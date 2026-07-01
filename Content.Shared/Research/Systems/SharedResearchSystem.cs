@@ -1,4 +1,5 @@
 using System.Linq;
+using Content.Shared.Backmen.Research;
 using Content.Shared.Lathe;
 using Content.Shared.Research.Components;
 using Content.Shared.Research.Prototypes;
@@ -9,7 +10,7 @@ using Robust.Shared.Utility;
 
 namespace Content.Shared.Research.Systems;
 
-public abstract partial class SharedResearchSystem : EntitySystem   // Goobstation - made class partial
+public abstract partial class SharedResearchSystem : EntitySystem
 {
     [Dependency] protected IPrototypeManager PrototypeManager = default!;
     [Dependency] private IRobustRandom _random = default!;
@@ -73,8 +74,8 @@ public abstract partial class SharedResearchSystem : EntitySystem   // Goobstati
         if (!component.SupportedDisciplines.Contains(tech.Discipline))
             return false;
 
-        // if (tech.Tier > disciplineTiers[tech.Discipline])    // Goobstation R&D Console rework - removed main discipline checks
-        //     return false;
+        if (tech.Tier > disciplineTiers[tech.Discipline])
+            return false;
 
         if (component.UnlockedTechnologies.Contains(tech.ID))
             return false;
@@ -126,8 +127,12 @@ public abstract partial class SharedResearchSystem : EntitySystem   // Goobstati
         {
             // we need to get the tech for the tier 1 below because that's
             // what the percentage in TierPrerequisites is referring to.
-            var unlockedTierTech = allUnlocked.Where(p => p.Tier == tier - 1).ToList();
-            var allTierTech = allTech.Where(p => p.Discipline == techDiscipline.ID && p.Tier == tier - 1).ToList();
+            // start-backmen: rnd-console-prereqs
+            var unlockedTierTech = allUnlocked.Where(p => p.Tier == tier - 1
+                && BkmResearchRequirements.IsEligibleForTier(p, tier - 1, PrototypeManager)).ToList();
+            var allTierTech = allTech.Where(p => p.Discipline == techDiscipline.ID && p.Tier == tier - 1
+                && BkmResearchRequirements.IsEligibleForTier(p, tier - 1, PrototypeManager)).ToList();
+            // end-backmen: rnd-console-prereqs
 
             if (allTierTech.Count == 0)
                 break;

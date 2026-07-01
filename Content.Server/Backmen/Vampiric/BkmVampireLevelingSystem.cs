@@ -1,5 +1,5 @@
 using Content.Server.Backmen.Vampiric.Role;
-using Content.Server.Body.Components;
+using Content.Shared.Body.Components;
 using Content.Server.Mind;
 using Content.Server.Polymorph.Components;
 using Content.Server.Polymorph.Systems;
@@ -10,7 +10,6 @@ using Content.Shared.Administration.Logs;
 using Content.Shared.Backmen.Abilities.Psionics;
 using Content.Shared.Backmen.Vampiric;
 using Content.Shared.Backmen.Vampiric.Components;
-using Content.Shared.Body;
 using Content.Shared.Chemistry.Reagent;
 using Content.Shared.Damage;
 using Content.Shared.Damage.Systems;
@@ -27,6 +26,7 @@ using Content.Shared.Slippery;
 using Content.Shared.Store;
 using Content.Shared.Store.Components;
 using Content.Shared.Stunnable;
+using Content.Shared.UserInterface;
 using Robust.Server.GameObjects;
 using Robust.Shared.Audio;
 using Robust.Shared.Audio.Systems;
@@ -37,6 +37,8 @@ namespace Content.Server.Backmen.Vampiric;
 
 public sealed partial class BkmVampireLevelingSystem : EntitySystem
 {
+    private const string StoreBoundUserInterface = "StoreBoundUserInterface";
+
     [Dependency] private StoreSystem _store = default!;
     [Dependency] private SharedActionsSystem _actions = default!;
     [Dependency] private MindSystem _mindSystem = default!;
@@ -63,6 +65,7 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
     {
         base.Initialize();
 
+        SubscribeLocalEvent<BkmVampireComponent, ComponentStartup>(OnVampireStartup);
         SubscribeLocalEvent<BkmVampireComponent, VampireShopActionEvent>(OnOpenShop);
         SubscribeLocalEvent<BkmVampireComponent, VampireStoreEvent>(OnShopBuyPerk);
         SubscribeLocalEvent<BkmVampireComponent, RefreshMovementSpeedModifiersEvent>(OnApplySprint);
@@ -70,6 +73,11 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
         SubscribeLocalEvent<BkmVampireComponent, InnateNewVampierActionEvent>(OnUseNewVamp);
         SubscribeLocalEvent<BkmVampireComponent, InnateNewVampierDoAfterEvent>(OnUseNewVampAfter);
         SubscribeLocalEvent<BloodSuckerComponent, PolymorphActionEvent>(OnPolymorphActionEvent, before: new []{ typeof(PolymorphSystem) });
+    }
+
+    private void OnVampireStartup(Entity<BkmVampireComponent> ent, ref ComponentStartup args)
+    {
+        InitShop(ent);
     }
 
     private void OnPolymorphActionEvent(Entity<BloodSuckerComponent> ent, ref PolymorphActionEvent args)
@@ -107,6 +115,8 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
         _stun.TryUpdateStunDuration(ent, TimeSpan.FromSeconds(_random.Next(1, 3)));
     }
 
+    private static readonly ProtoId<ReagentPrototype> Blood = "Blood";
+
     private void OnUseNewVamp(Entity<BkmVampireComponent> ent, ref InnateNewVampierActionEvent args)
     {
         if (HasComp<BkmVampireComponent>(args.Target))
@@ -123,7 +133,7 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
             return;
 
         var bloodReferenceSolution = bloodstream.BloodReferenceSolution;
-        if (bloodReferenceSolution == null || !bloodReferenceSolution.ContainsPrototype("Blood"))
+        if (bloodReferenceSolution == null || !bloodReferenceSolution.ContainsPrototype(Blood))
         {
             _popupSystem.PopupEntity(Loc.GetString("bloodsucker-fail-not-blood", ("target", args.Target)), args.Target, ent.Owner, Shared.Popups.PopupType.Medium);
             return;
@@ -202,15 +212,22 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
     {
         var ui = EnsureComp<UserInterfaceComponent>(ent);
         if (!_ui.HasUi(ent, StoreUiKey.Key, ui))
-        {
-            // у пользователя нет ui магазин!
-            return;
-        }
+            _ui.SetUi((ent, ui), StoreUiKey.Key, new InterfaceData(StoreBoundUserInterface));
+
+        EnsureVampireStore(ent);
         _actions.AddAction(ent, VmpShop);
+    }
+
+    private void EnsureVampireStore(Entity<BkmVampireComponent> ent)
+    {
         var store = EnsureComp<StoreComponent>(ent);
         store.RefundAllowed = false;
-        store.Categories.Add("VapmireT0");
-        store.CurrencyWhitelist.Add(ent.Comp.CurrencyPrototype);
+
+        if (!store.Categories.Contains("VapmireT0"))
+            store.Categories.Add("VapmireT0");
+
+        if (!store.CurrencyWhitelist.Contains(ent.Comp.CurrencyPrototype))
+            store.CurrencyWhitelist.Add(ent.Comp.CurrencyPrototype);
     }
 
     private static readonly ProtoId<PolymorphPrototype> BVampieBat = "BVampieBat";
@@ -288,7 +305,9 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
     public void UnlockTier(Entity<BkmVampireComponent> ent, int tier)
     {
         var store = EnsureComp<StoreComponent>(ent);
-        store.Categories.Add("VapmireT" + tier);
+        var category = "VapmireT" + tier;
+        if (!store.Categories.Contains(category))
+            store.Categories.Add(category);
 
         if (!_mindSystem.TryGetMind(ent, out var mindId, out var mind) ||
             !TryComp<VampireRoleComponent>(mindId, out var vmpRole))
@@ -314,6 +333,8 @@ public sealed partial class BkmVampireLevelingSystem : EntitySystem
         {
             va *= 3; // base mode buff
         }
+
+        EnsureVampireStore(ent);
 
         _store.TryAddCurrency(new Dictionary<string, FixedPoint2>
                 { { ent.Comp.CurrencyPrototype, va } },

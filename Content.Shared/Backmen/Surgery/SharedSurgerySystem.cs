@@ -1,6 +1,7 @@
 using System.Linq;
 using Content.Shared.Backmen.Surgery.Conditions;
 using Content.Shared.Backmen.Surgery.Consciousness.Systems;
+using Content.Shared.Backmen.Surgery.Pain;
 using Content.Shared.Backmen.Surgery.Pain.Systems;
 using Content.Shared.Backmen.Surgery.Steps.Parts;
 using Content.Shared.Backmen.Surgery.Traumas.Components;
@@ -9,9 +10,7 @@ using Content.Shared.Backmen.Surgery.Wounds.Components;
 using Content.Shared.Backmen.Surgery.Wounds.Systems;
 using Content.Shared.Medical.Surgery.Conditions;
 using Content.Shared.Body;
-using Content.Shared.Humanoid.Markings;
 using Content.Shared.Body.Part;
-using Content.Shared.Body.Systems;
 using Content.Shared.Backmen.Body.OrganRelations;
 using Content.Shared.Backmen.Body.Systems;
 using Content.Shared.Backmen.Targeting;
@@ -22,8 +21,6 @@ using Content.Shared.DoAfter;
 using Content.Shared.Mobs.Systems;
 using Content.Shared.GameTicking;
 using Content.Shared.Hands.EntitySystems;
-using Content.Shared.Humanoid;
-using Content.Shared.Humanoid.Markings;
 using Content.Shared.Interaction;
 using Content.Shared.Inventory;
 using Content.Shared.Popups;
@@ -93,6 +90,7 @@ public abstract partial class SharedSurgerySystem : EntitySystem
         SubscribeLocalEvent<SurgeryTraumaPresentConditionComponent, SurgeryValidEvent>(OnTraumaPresentConditionValid);
         SubscribeLocalEvent<SurgeryBleedsPresentConditionComponent, SurgeryValidEvent>(OnBleedsPresentConditionValid);
         SubscribeLocalEvent<SurgeryMarkingConditionComponent, SurgeryValidEvent>(OnMarkingPresentValid);
+        SubscribeLocalEvent<SurgeryStarvingPainConditionComponent, SurgeryValidEvent>(OnStarvingPainValid);
         //SubscribeLocalEvent<SurgeryRemoveLarvaComponent, SurgeryCompletedEvent>(OnRemoveLarva);
 
         InitializeSteps();
@@ -147,6 +145,16 @@ public abstract partial class SharedSurgerySystem : EntitySystem
                 ent.Comp.DamageGroup,
                 healable: true) <= 0)
             args.Cancelled = true;
+    }
+
+    private void OnStarvingPainValid(Entity<SurgeryStarvingPainConditionComponent> ent, ref SurgeryValidEvent args)
+    {
+        if (!_consciousness.TryGetNerveSystem(args.Body, out var nerveSys)
+            || !_pain.TryGetPainModifier(nerveSys.Value, args.Part, "Starving", out var modifier)
+            || modifier.Value.PainType != PainType.Starving)
+        {
+            args.Cancelled = true;
+        }
     }
 
     /*private void OnLarvaValid(Entity<SurgeryLarvaConditionComponent> ent, ref SurgeryValidEvent args)
@@ -411,7 +419,7 @@ public abstract partial class SharedSurgerySystem : EntitySystem
         return ent;
     }
 
-    private List<EntityUid> GetTools(EntityUid surgeon)
+    protected virtual List<EntityUid> GetTools(EntityUid surgeon)
     {
         var tools = new List<EntityUid>();
         foreach (var held in _hands.EnumerateHeld(surgeon))

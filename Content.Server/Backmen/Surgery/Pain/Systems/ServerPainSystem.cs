@@ -14,7 +14,6 @@ using Content.Shared.Backmen.Surgery.Wounds.Systems;
 using Content.Shared.Backmen.Targeting;
 using Content.Shared.Body;
 using Content.Shared.Body.Part;
-using Content.Shared.Body.Systems;
 using Content.Shared.Backmen.Body.Systems;
 using Content.Shared.FixedPoint;
 using Content.Shared.Humanoid;
@@ -54,6 +53,7 @@ public sealed partial class ServerPainSystem : PainSystem
 
     private const string PainModifierIdentifier = "WoundPain";
     private const string PainTraumaticModifierIdentifier = "TraumaticPain";
+    private const string PainStarvingModifierIdentifier = "Starving";
 
     private float _universalPainMultiplier = 1f;
     private float _maxPainPerInflicter = 100f;
@@ -310,6 +310,8 @@ public sealed partial class ServerPainSystem : PainSystem
             {
                 case PainType.TraumaticPain:
                     traumaticPain += wound.Comp2.Pain;
+                    break;
+                case PainType.Starving:
                     break;
                 default:
                     woundPain += wound.Comp2.Pain;

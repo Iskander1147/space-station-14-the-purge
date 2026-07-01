@@ -7,7 +7,6 @@ using Content.Shared.Hands.EntitySystems;
 using Content.Shared.Interaction.Components;
 using Content.Shared.Storage;
 using Content.Shared.Tag;
-using Robust.Shared.Network;
 using Robust.Shared.Prototypes;
 using Robust.Shared.Random;
 
@@ -28,7 +27,7 @@ public sealed partial class InnateToolSystem : EntitySystem
     public override void Initialize()
     {
         base.Initialize();
-        SubscribeLocalEvent<InnateToolComponent, MapInitEvent>(OnMapInit);
+        SubscribeLocalEvent<InnateToolComponent, MapInitEvent>(OnMapInit, after: [typeof(InitialBodySystem)]);
         SubscribeLocalEvent<InnateToolComponent, InitialBodySpawnedEvent>(OnInitialBodySpawned);
         SubscribeLocalEvent<InnateToolComponent, HandCountChangedEvent>(OnHandCountChanged);
         SubscribeLocalEvent<InnateToolComponent, ComponentShutdown>(OnShutdown);
@@ -41,17 +40,23 @@ public sealed partial class InnateToolSystem : EntitySystem
             return;
 
         component.ToSpawn = EntitySpawnCollection.GetSpawns(component.Tools, _robustRandom);
+        // start-backmen: innate-tool-auto-hands
+        EnsureHandsForTools(uid, component);
+        // end-backmen: innate-tool-auto-hands
         TryFillHands(uid, component);
     }
 
     private void OnInitialBodySpawned(EntityUid uid, InnateToolComponent component, InitialBodySpawnedEvent args)
     {
+        // start-backmen: innate-tool-auto-hands
+        EnsureHandsForTools(uid, component);
+        // end-backmen: innate-tool-auto-hands
         TryFillHands(uid, component);
     }
 
     private void OnHandCountChanged(EntityUid uid, InnateToolComponent component, HandCountChangedEvent args)
     {
-        TrySpawnOneInHand(uid, component);
+        TryFillHands(uid, component);
     }
 
     private void TryFillHands(EntityUid uid, InnateToolComponent component)
@@ -63,9 +68,58 @@ public sealed partial class InnateToolSystem : EntitySystem
         }
     }
 
+    // start-backmen: innate-tool-auto-hands
+    private void EnsureHandsForTools(EntityUid uid, InnateToolComponent component)
+    {
+        if (!TryComp<HandsComponent>(uid, out var hands))
+            return;
+
+        var requiredMiddleHands = component.Tools.Count;
+        var middleHandCount = 0;
+        foreach (var (_, hand) in hands.Hands)
+        {
+            if (hand.Location == HandLocation.Middle)
+                middleHandCount++;
+        }
+
+        var handIndex = 3;
+        while (middleHandCount < requiredMiddleHands)
+        {
+            string handId;
+            do
+            {
+                handId = $"innate-{handIndex++}";
+            } while (_sharedHandsSystem.TryGetHand((uid, hands), handId, out _));
+
+            _sharedHandsSystem.AddHand((uid, hands), handId, HandLocation.Middle);
+            middleHandCount++;
+        }
+    }
+
+    private bool TryPickupInnateHand(EntityUid uid, EntityUid item, HandsComponent hands)
+    {
+        foreach (var handId in hands.SortedHands)
+        {
+            if (hands.Hands[handId].Location != HandLocation.Middle)
+                continue;
+
+            if (!_sharedHandsSystem.HandIsEmpty((uid, hands), handId))
+                continue;
+
+            if (_sharedHandsSystem.TryPickup(uid, item, handId, checkActionBlocker: false))
+                return true;
+        }
+
+        return _sharedHandsSystem.TryPickupAnyHand(uid, item, checkActionBlocker: false);
+    }
+    // end-backmen: innate-tool-auto-hands
+
     private bool TrySpawnOneInHand(EntityUid uid, InnateToolComponent component)
     {
         if (component.ToSpawn.Count == 0)
+            return false;
+
+        if (!TryComp<HandsComponent>(uid, out var hands))
             return false;
 
         var spawnCoord = Transform(uid).Coordinates;
@@ -73,7 +127,9 @@ public sealed partial class InnateToolSystem : EntitySystem
 
         var item = Spawn(toSpawn, spawnCoord);
         AddComp<UnremoveableComponent>(item);
-        if (!_sharedHandsSystem.TryPickupAnyHand(uid, item, checkActionBlocker: false))
+        // start-backmen: innate-tool-auto-hands
+        if (!TryPickupInnateHand(uid, item, hands))
+        // end-backmen: innate-tool-auto-hands
         {
             QueueDel(item);
             return false;

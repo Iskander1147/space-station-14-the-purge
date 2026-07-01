@@ -1,7 +1,7 @@
 - type: cargoProduct
   id: ServiceJanitorial
   icon:
-    sprite: Objects/Specific/Janitorial/janitorial.rsi
+    sprite: Objects/Specific/Janitorial/spray_bottle.rsi
     state: cleaner
   product: CrateServiceJanitorialSupplies
   cost: 560
@@ -111,8 +111,8 @@
 - type: cargoProduct
   id: ServicePersonnel
   icon:
-    sprite: Objects/Misc/id_cards.rsi
-    state: default
+    sprite: Backmen/Objects/Misc/id_cards.rsi
+    state: card_default
   product: CrateServicePersonnel
   cost: 1000
   category: cargoproduct-category-name-service

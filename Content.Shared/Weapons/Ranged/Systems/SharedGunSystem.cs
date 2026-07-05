@@ -50,14 +50,13 @@ public abstract partial class SharedGunSystem : EntitySystem
     [Dependency] protected DamageableSystem Damageable = default!;
     [Dependency] protected ExamineSystemShared Examine = default!;
     [Dependency] protected IGameTiming Timing = default!;
-    [Dependency] protected IMapManager MapManager = default!;
-    [Dependency] protected IPrototypeManager ProtoManager = default!;
     [Dependency] protected IRobustRandom Random = default!;
     [Dependency] protected ISharedAdminLogManager Logs = default!;
     [Dependency] protected SharedActionsSystem Actions = default!;
     [Dependency] protected SharedAppearanceSystem Appearance = default!;
     [Dependency] protected SharedAudioSystem Audio = default!;
     [Dependency] protected SharedContainerSystem Containers = default!;
+    [Dependency] protected SharedMapSystem Maps = default!;
     [Dependency] protected SharedPhysicsSystem Physics = default!;
     [Dependency] protected SharedPointLightSystem Lights = default!;
     [Dependency] protected SharedPopupSystem PopupSystem = default!;
@@ -195,6 +194,7 @@ public abstract partial class SharedGunSystem : EntitySystem
     public bool TryGetGun(EntityUid entity, out Entity<GunComponent> gun)
     {
         gun = default;
+        entity = GetGunHandsHolder(entity); // backmen: vova-mech-gun-holder
 
         if (_hands.GetActiveItem(entity) is { } held &&
             TryComp(held, out GunComponent? gunComp))
@@ -344,9 +344,9 @@ public abstract partial class SharedGunSystem : EntitySystem
             return false;
         }
 
-        var fromCoordinates = Transform(user).Coordinates;
+        var (fromEntity, fromCoordinates, spawnCoordinates) = GetShootAmmoContext(user, gun); // backmen: vova-mech-gun-holder
         // Remove ammo
-        var ev = new TakeAmmoEvent(shots, [], fromCoordinates, user);
+        var ev = new TakeAmmoEvent(shots, [], spawnCoordinates, fromEntity);
 
         // Listen it just makes the other code around it easier if shots == 0 to do this.
         if (shots > 0)
@@ -453,7 +453,7 @@ public abstract partial class SharedGunSystem : EntitySystem
 
         var projectile = EnsureComp<ProjectileComponent>(uid);
         projectile.Weapon = gunUid;
-        var shooter = user ?? gunUid;
+        var shooter = GetProjectileShooter(user, gunUid); // backmen: vova-mech-gun-holder
         if (shooter != null)
             Projectiles.SetShooter(uid, projectile, shooter.Value);
 
@@ -495,6 +495,8 @@ public abstract partial class SharedGunSystem : EntitySystem
         // TODO: Sound limit version.
         var offsetPos = Random.NextVector2(EjectOffset);
         var xform = Transform(entity);
+
+        PrepareEjectCartridge(entity, xform); // backmen: casing-eject-grid-parent
 
         var coordinates = xform.Coordinates;
         coordinates = coordinates.Offset(offsetPos);

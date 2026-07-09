@@ -8,7 +8,9 @@ using Content.Server.RandomMetadata;
 using Content.Server.Zombies;
 using Content.Shared.Backmen.Language.Components;
 using Content.Shared.Backmen.Language.Systems;
+using Content.Shared.Backmen.Standing;
 using Content.Shared.Backmen.Surgery.Consciousness.Components;
+using Content.Shared.Bed.Sleep;
 using Content.Shared.Body;
 using Content.Shared.Body.Events;
 using Content.Shared.Damage;
@@ -23,7 +25,9 @@ using Content.Shared.Trigger;
 using Content.Shared.Trigger.Components.Triggers;
 using Content.Shared.Weapons.Melee;
 using Content.Shared.Zombies;
+using Robust.Shared.Map;
 using Robust.Shared.Prototypes;
+using Robust.Shared.Timing;
 using System.Linq;
 using Robust.Shared.Utility;
 
@@ -45,6 +49,8 @@ public sealed partial class NPCZombieSystem : EntitySystem
     [Dependency] private MobThresholdSystem _mobThresholds = default!;
     [Dependency] private ServerConsciousnessSystem _consciousness = default!;
     [Dependency] private StatusEffectsSystem _status = default!;
+    [Dependency] private SharedStunSystem _stun = default!;
+    [Dependency] private SharedLayingDownSystem _layingDown = default!;
     [Dependency] private EntityQuery<ZombieSurpriseComponent> _zombieSurpriseQuery = default!;
     [Dependency] private EntityQuery<ZombieComponent> _zombieQuery = default!;
 
@@ -99,15 +105,16 @@ public sealed partial class NPCZombieSystem : EntitySystem
         RemComp<ZombieSurpriseComponent>(ev.Target);
         _mobThresholds.SetAllowRevives(ev.Target, true);
 
-        _status.TryRemoveStatusEffect(ev.Target, SharedStunSystem.StunId);
-        RemComp<StunnedComponent>(ev.Target);
-
-        if (TryComp<StandingStateComponent>(ev.Target, out var standing))
-            _stateSystem.Stand(ev.Target, standing, force: true);
-        else
-            _stateSystem.Stand(ev.Target, force: true);
-
         _zombieSystem.ZombifyEntity(ev.Target);
+        ClearMobStunAndStand(ev.Target);
+
+        var target = ev.Target;
+        Timer.Spawn(TimeSpan.Zero, () =>
+        {
+            if (!TerminatingOrDeleted(target))
+                ClearMobStunAndStand(target);
+        });
+
         EnsureComp<UniversalLanguageSpeakerComponent>(ev.Target);
         _language.SetLanguage(ev.Target, SharedLanguageSystem.Universal);
         RemComp<GhostTakeoverAvailableComponent>(ev.Target);
@@ -169,6 +176,72 @@ public sealed partial class NPCZombieSystem : EntitySystem
             z.HealingOnBite = hspec;
         }
         Dirty(ev.Target,z);
+    }
+
+    /// <summary>
+    /// Clears stun from mobs on the planet map after the crash.
+    /// Zombies are also forced upright; posed surprise corpses only lose stun.
+    /// </summary>
+    public void ClearStunOnMap(MapId? mapId)
+    {
+        if (mapId == null || mapId == MapId.Nullspace)
+            return;
+
+        RunClearStunOnMap(mapId.Value);
+        Timer.Spawn(TimeSpan.Zero, () => RunClearStunOnMap(mapId.Value));
+    }
+
+    private void RunClearStunOnMap(MapId mapId)
+    {
+        var query = AllEntityQuery<MobStateComponent, TransformComponent>();
+        while (query.MoveNext(out var uid, out _, out var xform))
+        {
+            if (xform.MapID != mapId)
+                continue;
+
+            ClearEntityStun(uid);
+        }
+    }
+
+    private void ClearMobStunAndStand(EntityUid uid)
+    {
+        ClearEntityStun(uid, forceStand: true);
+    }
+
+    /// <summary>
+    /// Corpses and sleep/knockdown can leave a bare <see cref="StunnedComponent"/> without visuals.
+    /// Status-effect removal is deferred, so we also clear again on the next tick.
+    /// </summary>
+    private void ClearEntityStun(EntityUid uid, bool? forceStand = null)
+    {
+        if (TerminatingOrDeleted(uid))
+            return;
+
+        if (HasComp<SleepingComponent>(uid))
+            RemComp<SleepingComponent>(uid);
+
+        _status.TryRemoveStatusEffect(uid, SharedStunSystem.StunId);
+
+        if (TryComp<KnockedDownComponent>(uid, out var knocked))
+        {
+            _stun.CancelKnockdownDoAfter((uid, knocked));
+            RemComp<KnockedDownComponent>(uid);
+        }
+
+        _stun.TryUnstun(uid);
+        RemComp<StunnedComponent>(uid);
+
+        var shouldStand = forceStand ?? _zombieQuery.HasComp(uid);
+        if (!shouldStand)
+            return;
+
+        if (!TryComp<StandingStateComponent>(uid, out var standing) || !_stateSystem.IsDown((uid, standing)))
+            return;
+
+        if (TryComp<LayingDownComponent>(uid, out var laying))
+            _layingDown.TryStandUp(uid, laying, standing);
+        else
+            _stateSystem.Stand(uid, standing, force: true);
     }
 
     private void OnSpawnZombifiedStartup(EntityUid uid, ZombifiedOnSpawnComponent component, MapInitEvent args)

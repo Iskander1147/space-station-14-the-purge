@@ -484,11 +484,6 @@ public partial class WoundSystem
         return severity * toMultiply;
     }
 
-    /// <summary>
-    /// Upper bound for <see cref="WoundComponent.WoundSeverityPoint"/> on this side.
-    /// </summary>
-    protected virtual FixedPoint2 GetMaxWoundSeverity() => FixedPoint2.New(200);
-
     [PublicAPI]
     public DamageSpecifier GetWoundsChanged(
         EntityUid woundable,
@@ -541,10 +536,8 @@ public partial class WoundSystem
                     }
 
                     var currentSeverity = continuedWound.Value.Comp.WoundSeverityPoint;
-                    var severityDelta = FixedPoint2.Clamp(
-                        currentSeverity + severityApplied,
-                        FixedPoint2.Zero,
-                        GetMaxWoundSeverity()) - currentSeverity;
+                    var severityDelta = FixedPoint2.Max(FixedPoint2.Zero, currentSeverity + severityApplied)
+                        - currentSeverity;
 
                     actuallyInducedDamage.DamageDict[damagePiece.Key] = severityDelta;
                     if (severityDelta > FixedPoint2.Zero)
@@ -569,9 +562,7 @@ public partial class WoundSystem
                     continue;
                 }
 
-                var severity = FixedPoint2.Min(
-                    ApplySeverityModifiers(woundable, damagePiece.Value, component),
-                    GetMaxWoundSeverity());
+                var severity = ApplySeverityModifiers(woundable, damagePiece.Value, component);
 
                 if (severity <= FixedPoint2.Zero)
                 {
@@ -795,6 +786,8 @@ public partial class WoundSystem
             result[part] = woundable.WoundableSeverity;
         }
 
+        ApplyDependentOrganLoss(states: result);
+
         return result;
     }
 
@@ -842,7 +835,24 @@ public partial class WoundSystem
             result[part] = nearestSeverity;
         }
 
+        ApplyDependentOrganLoss(states: result);
+
         return result;
+    }
+
+    private static void ApplyDependentOrganLoss(Dictionary<TargetBodyPart, WoundableSeverity> states)
+    {
+        foreach (var (proximalCategory, distalCategory) in SurgeryBodyPartMapping.DependentCategoryPairs)
+        {
+            if (!TargetBodyPartMapping.TryGetTargetPart(proximalCategory, out var proximalPart)
+                || !TargetBodyPartMapping.TryGetTargetPart(distalCategory, out var distalPart))
+                continue;
+
+            if (!states.TryGetValue(proximalPart, out var proximalState) || proximalState != WoundableSeverity.Loss)
+                continue;
+
+            states[distalPart] = WoundableSeverity.Loss;
+        }
     }
 
     private static WoundableSeverity WorseSeverity(WoundableSeverity current, WoundableSeverity incoming) =>
@@ -882,6 +892,32 @@ public partial class WoundSystem
         return !Resolve(body, ref comp)
                 ? FixedPoint2.Zero
                 : GetBodyWounds(body, comp).Aggregate(FixedPoint2.Zero, (current, wound) => current + wound.Comp.WoundSeverityPoint);
+    }
+
+    /// <summary>
+    /// Aggregates wound severity points on a body by damage type.
+    /// Used to keep <see cref="DamageableComponent"/> in sync with the wound model.
+    /// </summary>
+    public DamageSpecifier GetBodyWoundDamageSpecifier(
+        EntityUid body,
+        BodyComponent? comp = null)
+    {
+        var damage = new DamageSpecifier();
+
+        if (!Resolve(body, ref comp))
+            return damage;
+
+        foreach (var wound in GetBodyWounds(body, comp))
+        {
+            var severity = wound.Comp.WoundSeverityPoint;
+            if (severity <= FixedPoint2.Zero)
+                continue;
+
+            damage.DamageDict.TryGetValue(wound.Comp.DamageType, out var existing);
+            damage.DamageDict[wound.Comp.DamageType] = existing + severity;
+        }
+
+        return damage;
     }
 
     /// <summary>

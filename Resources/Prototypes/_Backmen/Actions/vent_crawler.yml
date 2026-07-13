@@ -1,0 +1,14 @@
+- type: entity
+  id: ActionVentCrawlerExit
+  parent: BaseAction
+  name: climb out of vent
+  description: Exit through a nearby air vent.
+  categories: [ HideSpawnMenu ]
+  components:
+  - type: Action
+    priority: 1
+    icon:
+      sprite: Structures/Piping/Atmospherics/vent.rsi
+      state: vent_off
+  - type: InstantAction
+    event: !type:VentCrawlerExitActionEvent

@@ -1,15 +1,20 @@
 using Content.IntegrationTests.Fixtures;
+using Content.IntegrationTests.Fixtures.Attributes;
 using Content.Server.Backmen.Shipwrecked.Components;
 using Content.Server.Humanoid.Systems;
 using Content.Shared.Backmen.Shipwrecked;
 using Content.Shared.Backmen.Surgery.Consciousness.Components;
+using Content.Shared.CCVar;
 using Content.Shared.Damage;
 using Content.Shared.Damage.Components;
 using Content.Shared.Damage.Systems;
 using Content.Shared.FixedPoint;
 using Content.Shared.Mobs;
 using Content.Shared.Mobs.Components;
+using Content.Shared.NPC;
+using Content.Shared.SSDIndicator;
 using Content.Shared.Standing;
+using Content.Shared.StatusEffectNew;
 using Content.Shared.Stunnable;
 using Content.Shared.Trigger;
 using Content.Shared.Trigger.Components.Triggers;
@@ -24,6 +29,7 @@ namespace Content.IntegrationTests.Tests.Backmen.Shipwreck;
 /// Surprise zombies only turn into zombies after their proximity trigger fires.
 /// </summary>
 [TestFixture]
+[EnsureCVar(Side.Server, typeof(CCVars), nameof(CCVars.ICSSDSleep), true)]
 public sealed class ShipwreckCorpseTest : GameTest
 {
     private static readonly EntProtoId SalvageHumanCorpse = "SalvageHumanCorpse";
@@ -137,6 +143,41 @@ public sealed class ShipwreckCorpseTest : GameTest
     }
 
     [Test]
+    public async Task ZombieSurprise_DetectorNotDisabledByCorpseCollision()
+    {
+        var map = await Pair.CreateTestMap();
+        var randomHumanoid = Server.EntMan.System<RandomHumanoidSystem>();
+        EntityUid corpse = default;
+        EntityUid? detector = null;
+
+        await Server.WaitPost(() =>
+        {
+            corpse = randomHumanoid.SpawnRandomHumanoid("ZombieSurprise", map.GridCoords, "zombie surprise");
+        });
+
+        await Pair.RunTicksSync(10);
+
+        await Server.WaitAssertion(() =>
+        {
+            var query = Server.EntMan.AllEntityQueryEnumerator<ZombieWakeupOnTriggerComponent, TriggerOnProximityComponent>();
+            while (query.MoveNext(out var uid, out var wakeup, out var proximity))
+            {
+                if (wakeup.ToZombify != corpse)
+                    continue;
+
+                detector = uid;
+                Assert.That(proximity.Enabled, Is.True,
+                    "Surprise corpse collision must not permanently disable the proximity detector.");
+                break;
+            }
+
+            Assert.That(detector, Is.Not.Null);
+            Assert.That(Server.EntMan.HasComponent<ZombieComponent>(corpse), Is.False,
+                "Corpse self-collision must not zombify the surprise NPC.");
+        });
+    }
+
+    [Test]
     public async Task ZombieSurprise_ProximityTrigger_Zombifies()
     {
         var map = await Pair.CreateTestMap();
@@ -192,6 +233,8 @@ public sealed class ShipwreckCorpseTest : GameTest
     [Test]
     public async Task ZombifiedOnSpawn_SpawnsAliveAndMobile()
     {
+        await OverrideCVar(Side.Server, CCVars.ICSSDSleepTime, 0.1f);
+
         var map = await Pair.CreateTestMap();
         var randomHumanoid = Server.EntMan.System<RandomHumanoidSystem>();
         EntityUid zombie = default;
@@ -201,16 +244,20 @@ public sealed class ShipwreckCorpseTest : GameTest
             zombie = randomHumanoid.SpawnRandomHumanoid("Zombie", map.GridCoords, "zombie");
         });
 
-        await Pair.RunTicksSync(10);
+        await Pair.RunTicksSync(150);
 
         await Server.WaitAssertion(() =>
         {
+            var statusSys = Server.EntMan.System<StatusEffectsSystem>();
+
             Assert.That(Server.EntMan.EntityExists(zombie), Is.True);
             Assert.That(Server.EntMan.HasComponent<ZombieComponent>(zombie), Is.True,
                 "ZombifiedOnSpawn mobs must be zombified after spawn.");
             Assert.That(Server.EntMan.HasComponent<ZombifiedOnSpawnComponent>(zombie), Is.False,
                 "ZombifiedOnSpawn component should be removed after zombification.");
             Assert.That(Server.EntMan.HasComponent<ConsciousnessComponent>(zombie), Is.False);
+            Assert.That(Server.EntMan.HasComponent<ActiveNPCComponent>(zombie), Is.True,
+                "ZombifiedOnSpawn mobs must be active AI NPCs.");
 
             Assert.That(Server.EntMan.TryGetComponent(zombie, out MobStateComponent? mobState), Is.True);
             Assert.That(mobState!.CurrentState, Is.EqualTo(MobState.Alive),
@@ -218,6 +265,8 @@ public sealed class ShipwreckCorpseTest : GameTest
 
             Assert.That(Server.EntMan.HasComponent<StunnedComponent>(zombie), Is.False,
                 "ZombifiedOnSpawn mobs must not be stunned.");
+            Assert.That(statusSys.HasStatusEffect(zombie, SSDIndicatorSystem.StatusEffectSSDSleeping), Is.False,
+                "ZombifiedOnSpawn mobs must not be stuck in SSD forced sleep.");
             Assert.That(Server.EntMan.TryGetComponent(zombie, out StandingStateComponent? standing), Is.True);
             Assert.That(standing!.Standing, Is.True,
                 "ZombifiedOnSpawn mobs must be standing, not crawling.");

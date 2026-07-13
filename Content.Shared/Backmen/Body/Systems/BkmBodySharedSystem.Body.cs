@@ -18,6 +18,7 @@ using Content.Shared.Containers.ItemSlots;
 using Content.Shared.Gibbing.Components;
 using Content.Shared.Gibbing.Events;
 using Content.Shared.Gibbing.Systems;
+using Content.Shared.Hands.Components;
 using Content.Shared.Inventory;
 using Content.Shared.Inventory.Events;
 using Content.Shared.Inventory.VirtualItem;
@@ -124,17 +125,16 @@ public partial class BkmBodySharedSystem
         if (!TryComp(args.Organ, out OrganComponent? organ))
             return;
 
-        if (organ.Category is { } removedLeg
-            && (removedLeg == "LegLeft" || removedLeg == "LegRight")
+        if (organ.Category is { } removedCategory
+            && SurgeryBodyPartMapping.TryGetDependentCategory(removedCategory, out var dependentCategory)
             && !TerminatingOrDeleted(ent)
             && !EntityManager.IsQueuedForDeletion(ent)
-            && SurgeryBodyPartMapping.TryGetDependentCategory(removedLeg, out var dependentFoot)
-            && _nubody.TryGetOrganByCategory(ent.AsNullable(), dependentFoot, out var footOrgan)
-            && !TerminatingOrDeleted(footOrgan)
-            && !EntityManager.IsQueuedForDeletion(footOrgan))
+            && _nubody.TryGetOrganByCategory(ent.AsNullable(), dependentCategory, out var dependentOrgan)
+            && !TerminatingOrDeleted(dependentOrgan)
+            && !EntityManager.IsQueuedForDeletion(dependentOrgan))
         {
-            // Surgery limb detachment moves the foot with the leg via DetachableOrganSystem.
-            // Detached limb bundles keep the foot until the leg is reattached (TransferDetachedSubtreeOrgans).
+            // Surgery limb detachment moves the distal part with the proximal limb via DetachableOrganSystem.
+            // Detached limb bundles keep the distal part until the proximal limb is reattached.
             var detachableSurgery = HasComp<DetachableOrganComponent>(args.Organ) && HasComp<SurgeryTargetComponent>(ent);
             var detachedLimbBundle = HasComp<BkmDetachedBodyComponent>(ent);
 
@@ -142,12 +142,12 @@ public partial class BkmBodySharedSystem
                 && !detachedLimbBundle
                 && Net.IsServer
                 && ent.Comp.Organs != null
-                && ent.Comp.Organs.Contains(footOrgan.Owner)
-                && Containers.Remove(footOrgan.Owner, ent.Comp.Organs, force: true, reparent: false)
-                && TryComp<OrganComponent>(footOrgan, out var footComp))
+                && ent.Comp.Organs.Contains(dependentOrgan.Owner)
+                && Containers.Remove(dependentOrgan.Owner, ent.Comp.Organs, force: true, reparent: false)
+                && TryComp<OrganComponent>(dependentOrgan, out var dependentComp))
             {
-                RemoveOrgan((footOrgan.Owner, footComp), ent.Owner);
-                QueueDel(footOrgan.Owner);
+                RemoveOrgan((dependentOrgan.Owner, dependentComp), ent.Owner);
+                QueueDel(dependentOrgan.Owner);
             }
         }
 
@@ -411,18 +411,74 @@ public partial class BkmBodySharedSystem
         }
 
         if (TryComp<InventoryComponent>(bodyId, out var inventory))
-        {
-            foreach (var item in _inventorySystem.GetHandOrInventoryEntities(bodyId))
-            {
-                if (HasComp<VirtualItemComponent>(item))
-                    continue;
+            DropAllInventoryAndHands(bodyId, inventory, gibs);
 
-                SharedTransform.DropNextTo(item, (bodyId, bodyTransform));
-                gibs.Add(item);
-            }
+        var scatter = EntityManager.System<BkmDetachedBodyScatterSystem>();
+        foreach (var gibEntity in gibs)
+        {
+            if (HasComp<BkmDetachedBodyComponent>(gibEntity))
+                scatter.ScatterViolentBundle(gibEntity, bodyTransform.Coordinates, splatDirection, splatModifier);
         }
+
         _audioSystem.PlayPredicted(gibSoundOverride, bodyTransform.Coordinates, null);
         return gibs;
+    }
+
+    /// <summary>
+    /// Whether the mob body container has no organs left (post-gib shell).
+    /// </summary>
+    public bool IsOrganlessBody(EntityUid bodyId, BodyComponent? body = null)
+    {
+        return !Resolve(bodyId, ref body, logMissing: false)
+            || body!.Organs == null
+            || body.Organs.Count == 0;
+    }
+
+    /// <summary>
+    /// Unequips worn items and drops held entities during gib cleanup.
+    /// </summary>
+    protected void DropAllInventoryAndHands(
+        EntityUid bodyId,
+        InventoryComponent? inventory = null,
+        HashSet<EntityUid>? gibs = null)
+    {
+        if (Resolve(bodyId, ref inventory, logMissing: false))
+        {
+            foreach (var slot in inventory!.Slots.ToArray())
+            {
+                if (!InventorySystem.TryUnequip(bodyId, bodyId, slot.Name, out var item, silent: true, force: true,
+                        inventory: inventory))
+                    continue;
+
+                gibs?.Add(item.Value);
+            }
+        }
+
+        if (!TryComp<HandsComponent>(bodyId, out var hands))
+            return;
+
+        foreach (var held in HandsSystem.EnumerateHeld((bodyId, hands)).ToArray())
+        {
+            if (HasComp<VirtualItemComponent>(held))
+                continue;
+
+            if (HandsSystem.TryDrop(bodyId, held, checkActionBlocker: false))
+                gibs?.Add(held);
+        }
+    }
+
+    /// <summary>
+    /// Drops worn items and deletes an organless mob shell after gib or violent torso scatter.
+    /// </summary>
+    public void CleanupGibbedBodyShell(EntityUid bodyId)
+    {
+        if (!Exists(bodyId) || TerminatingOrDeleted(bodyId) || EntityManager.IsQueuedForDeletion(bodyId))
+            return;
+
+        DropAllInventoryAndHands(bodyId);
+
+        if (Net.IsServer && Exists(bodyId) && !TerminatingOrDeleted(bodyId))
+            QueueDel(bodyId);
     }
 
     private int GetOrganRelationDepth(EntityUid organId)
@@ -465,8 +521,8 @@ public partial class BkmBodySharedSystem
         if (HasBothHumanFeet(ent, ent.Comp) || !TryComp<InventoryComponent>(ent, out var inventory))
             return;
 
-        _inventorySystem.DropSlotContents(ent, "shoes", inventory);
-        _inventorySystem.DropSlotContents(ent, "socks", inventory);
+        InventorySystem.DropSlotContents(ent, "shoes", inventory);
+        InventorySystem.DropSlotContents(ent, "socks", inventory);
     }
 
     private void OnEquipTargetAttempt(Entity<BodyComponent> ent, ref IsEquippingTargetAttemptEvent args)

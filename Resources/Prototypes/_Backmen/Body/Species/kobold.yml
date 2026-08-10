@@ -5,6 +5,9 @@
     enum.HumanoidVisualLayers.Special:
       limit: 1
       required: false
+    enum.HumanoidVisualLayers.HeadTop:
+      limit: 1
+      required: false
     enum.HumanoidVisualLayers.Chest:
       limit: 1
       required: false
@@ -80,6 +83,7 @@
     - Kobold
     understands:
     - Kobold
+    - TauCetiBasic
   - type: Speech
     speechSounds: Lizard
     speechVerb: Reptilian
@@ -150,6 +154,8 @@
     sprite: Mobs/Animals/kobold.rsi
     state: full
 
+# --- Organs (nubody: VisualOrgan on External, like OrganHumanExternal) ---
+
 - type: entity
   parent: OrganBaseOrganic
   id: OrganKobold
@@ -157,23 +163,18 @@
   suffix: kobold
 
 - type: entity
-  id: OrganKoboldVisual
+  parent: OrganKobold
+  id: OrganKoboldExternal
   abstract: true
   components:
+  - type: Sprite
+    sprite: Mobs/Animals/kobold.rsi
   - type: VisualOrgan
     data:
       sprite: Mobs/Animals/kobold.rsi
   - type: VisualOrganMarkings
     markingData:
       group: Kobold
-
-- type: entity
-  parent: [ OrganKobold, OrganKoboldVisual ]
-  id: OrganKoboldExternal
-  abstract: true
-  components:
-  - type: Sprite
-    sprite: Mobs/Animals/kobold.rsi
 
 - type: entity
   parent: [ OrganBaseTorsoSexed, OrganBaseTorso, OrganKoboldExternal ]
@@ -185,6 +186,7 @@
   components:
   - type: VisualOrganMarkings
     markingData:
+      group: Kobold
       layers:
       - Head
       - HeadTop
@@ -223,10 +225,20 @@
   id: OrganKoboldFootRight
 
 - type: entity
-  parent: [ OrganKoboldVisual, OrganBaseEyes, OrganAnimalEyes ]
+  parent: [ OrganBaseEyes, OrganKobold ]
   id: OrganKoboldEyes
   components:
+  - type: Sprite
+    sprite: Backmen/Mobs/Animals/Kobold/organs.rsi
+    layers:
+    - state: eyeball-l
+    - state: eyeball-r
   - type: VisualOrgan
     data:
       sprite: Mobs/Animals/kobold.rsi
       state: eyes
+  - type: VisualOrganMarkings
+    markingData:
+      group: Kobold
+      layers:
+      - Eyes

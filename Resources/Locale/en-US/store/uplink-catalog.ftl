@@ -3,7 +3,7 @@ uplink-pistol-viper-name = Viper
 uplink-pistol-viper-desc = A small, easily concealable, but somewhat underpowered gun. Retrofitted with a fully automatic receiver. Uses pistol magazines (.35 auto).
 
 uplink-revolver-python-name = Python
-uplink-revolver-python-desc = A brutally simple, effective, and loud Syndicate revolver. Comes loaded with armor-piercing rounds. Uses .45 magnum.
+uplink-revolver-python-desc = A brutally simple, effective, and loud Syndicate revolver. Comes loaded with armor-piercing rounds. Uses .357 magnum.
 
 uplink-pistol-cobra-name = Cobra
 uplink-pistol-cobra-desc = A rugged, robust operator handgun with inbuilt silencer. Uses pistol magazines (.25 caseless).
@@ -213,14 +213,6 @@ uplink-freedom-implanter-name = Freedom Implanter
 uplink-freedom-implanter-desc = Get away from those nasty sec officers with this three use implant!
 uplink-combat-training-name = Combat Training Implanter
 uplink-combat-training-desc = A Syndicate implant that improves aimed-shot accuracy to Security-tier levels (~35–40%).
-combat-training-implanter-name = Combat Training Implanter
-combat-training-implanter-desc = A Syndicate implanter that installs a combat training implant.
-combat-training-implant-name = Combat Training Implant
-combat-training-implant-desc = Improves aimed-shot accuracy to Security-tier levels (~35–40%).
-combat-marksmanship-implanter-admeme-name = Combat Marksmanship Implanter
-combat-marksmanship-implanter-admeme-desc = Admin implanter that grants 100% accuracy on the targeted body part.
-combat-marksmanship-implant-admeme-name = Combat Marksmanship Implant
-combat-marksmanship-implant-admeme-desc = Admin implant that guarantees hits on the aimed body part.
 
 uplink-scram-implanter-name = Scram Implanter
 uplink-scram-implanter-desc = A 2-use implant which teleports you within a large radius. Attempts to teleport you onto an unobstructed tile. May sometimes fail to do so. Life insurance not included.
@@ -540,3 +532,11 @@ uplink-energycrossbow-desc = The go-to sidearm of any operative who prefers thei
 #Objective items
 uplink-hijack-beacon-name = Hijack Beacon
 uplink-hijack-beacon-desc = A syndicate-brand hijack beacon designed to get around the firewalls of Nanotrasen-brand Automated Trade Stations. They take 200 seconds to work and Trade Stations will announce they are being hacked, so prepare accordingly.
+uplink-voice-mask-name = Голосовая маска
+uplink-voice-mask-desc = Противогаз, позволяющий подстраивать свой голос под кого угодно.
+uplink-dart-syringe-gun-name = Шприцемёт
+uplink-dart-syringe-gun-desc = Оружие, которое принимает шприцы в качестве снарядов, и вводит их содержимое в своих жертв. Может проходить сквозь броню.
+uplink-buldog-bundle-name = Набор "Бульдог"
+uplink-buldog-bundle-desc = Простой и надёжный: Содержит популярный дробовик Бульдог и 4 барабана дроби.
+uplink-clothing-thieving-gloves-name = Воровские перчатки
+uplink-clothing-thieving-gloves-desc = Незаметно обчищайте карманы и улучшайте свой навык воровства с помощью этих новых модных перчаток. Они даже выглядят как обычные!

@@ -54,8 +54,18 @@
       reagents:
       - ReagentId: Blood
         Quantity: 50
-  - type: ReplacementAccent
-    accent: mouse
+  # start-backmen: mouse-language
+  # - type: ReplacementAccent
+  #   accent: mouse
+  - type: LanguageSpeaker
+    currentLanguage: Mouse
+  - type: LanguageKnowledge
+    speaks:
+    - Mouse
+    understands:
+    - Mouse
+    - TauCetiBasic
+  # end-backmen: mouse-language
   - type: MeleeWeapon
     soundHit:
         path: /Audio/Effects/bite.ogg
@@ -277,8 +287,18 @@
     eggSpawn:
     - id: FoodEgg
   - type: ExaminableHunger
-  - type: ReplacementAccent
-    accent: chicken
+  # start-backmen: chicken-language
+  # - type: ReplacementAccent
+  #   accent: chicken
+  - type: LanguageSpeaker
+    currentLanguage: Chicken
+  - type: LanguageKnowledge
+    speaks:
+    - Chicken
+    understands:
+    - Chicken
+    - TauCetiBasic
+  # end-backmen: chicken-language
   - type: SentienceTarget
     flavorKind: station-event-random-sentience-flavor-organic
   - type: NpcFactionMember
@@ -726,8 +746,18 @@
     eggSpawn:
     - id: FoodEgg
   - type: ExaminableHunger
-  - type: ReplacementAccent
-    accent: duck
+  # start-backmen: duck-language
+  # - type: ReplacementAccent
+  #   accent: duck
+  - type: LanguageSpeaker
+    currentLanguage: Duck
+  - type: LanguageKnowledge
+    speaks:
+    - Duck
+    understands:
+    - Duck
+    - TauCetiBasic
+  # end-backmen: duck-language
   - type: SentienceTarget
     flavorKind: station-event-random-sentience-flavor-organic
   - type: NpcFactionMember
@@ -947,6 +977,16 @@
     guides:
     - Chef
     - FoodRecipes
+  # start-backmen: cow-language
+  - type: LanguageSpeaker
+    currentLanguage: Cow
+  - type: LanguageKnowledge
+    speaks:
+    - Cow
+    understands:
+    - Cow
+    - TauCetiBasic
+  # end-backmen: cow-language
 
 - type: entity
   name: crab
@@ -1002,8 +1042,18 @@
     interactSuccessSpawn: EffectHearts
     interactSuccessSound:
       path: /Audio/Voice/Arachnid/arachnid_chitter.ogg
-  - type: ReplacementAccent
-    accent: crab
+  # start-backmen: crab-language
+  # - type: ReplacementAccent
+  #   accent: crab
+  - type: LanguageSpeaker
+    currentLanguage: Crab
+  - type: LanguageKnowledge
+    speaks:
+    - Crab
+    understands:
+    - Crab
+    - TauCetiBasic
+  # end-backmen: crab-language
   - type: Bloodstream
     bloodReferenceSolution:
       reagents:
@@ -1100,6 +1150,16 @@
       Male: Goat
       Unsexed: Goat
   - type: BleatingAccent
+  # start-backmen: goat-language
+  - type: LanguageSpeaker
+    currentLanguage: Goat
+  - type: LanguageKnowledge
+    speaks:
+    - Goat
+    understands:
+    - Goat
+    - TauCetiBasic
+  # end-backmen: goat-language
   - type: InteractionPopup
     successChance: 0.2
     interactSuccessString: petting-success-goat
@@ -1282,8 +1342,18 @@
   - type: Inventory
     speciesId: kangaroo
     templateId: kangaroo
-  - type: ReplacementAccent
-    accent: kangaroo
+  # start-backmen: kangaroo-language
+  # - type: ReplacementAccent
+  #   accent: kangaroo
+  - type: LanguageSpeaker
+    currentLanguage: Kangaroo
+  - type: LanguageKnowledge
+    speaks:
+    - Kangaroo
+    understands:
+    - Kangaroo
+    - TauCetiBasic
+  # end-backmen: kangaroo-language
   - type: Butcherable
     spawned:
     - id: FoodMeat
@@ -1344,18 +1414,17 @@
     factions:
     - SimpleHostile
 
+# Shared ancestor NPC bits without a damage model (Injurable vs Consciousness chosen by children).
+# start-backmen: ancestor-surgery
 - type: entity
   name: genetic ancestor
-  id: MobBaseAncestor
-  parent: [BaseMobAnimal, SimpleMobBase, StripableInventoryBase]
+  id: MobBaseAncestorCommon
+  parent: [SimpleMobBaseCore, StripableInventoryBase]
   description: The genetic bipedal ancestor of... Uh... Something. Yeah, there's definitely something on the station that descended from whatever this is.
   abstract: true
   components:
   - type: CombatMode
     canDisarm: true
-  - type: Inventory
-    templateId: monkey
-    speciesId: monkey
   - type: Deathgasp
     prototype: MonkeyDeathgasp
   - type: Cuffable
@@ -1374,33 +1443,6 @@
         layer:
         - MobLayer
   - type: Stripping
-  - type: Sprite
-    drawdepth: Mobs
-    layers:
-    - map: ["enum.DamageStateVisualLayers.Base"]
-      state: monkey
-      sprite: Mobs/Animals/monkey.rsi
-    - map: [ "jumpsuit" ]
-    - map: [ "enum.HumanoidVisualLayers.Handcuffs" ]
-      color: "#ffffff"
-      sprite: Objects/Misc/handcuffs.rsi
-      state: body-overlay-2
-      visible: false
-    - map: [ "ears" ]
-    - map: [ "id" ]
-    - map: [ "outerClothing" ]
-    - map: [ "mask" ]
-    - map: [ "head" ]
-    - map: [ "clownedon" ]
-      sprite: "Effects/creampie.rsi"
-      state: "creampie_human"
-      visible: false
-  - type: Hands
-    activeHandId: Hand
-    hands:
-      Hand:
-        location: Left
-  - type: ComplexInteraction
   - type: GenericVisualizer
     visuals:
       enum.CreamPiedVisuals.Creamed:
@@ -1465,21 +1507,60 @@
   - type: StatusIcon
     bounds: -0.5,-0.5,0.5,0.5
   - type: JobStatus # marks them as crew
+  - type: UserInterface
+    interfaces:
+      enum.StrippingUiKey.Key:
+        type: StrippableBoundUserInterface
 
+# Flat / Injurable ancestors (scurret etc.) — no VisualBody, no Consciousness.
+- type: entity
+  id: MobBaseAncestor
+  parent: [MobBaseAncestorCommon, MobDamageable]
+  abstract: true
 
+# Layered surgery ancestors — Consciousness + MobDamageableSurgery (no Injurable).
+- type: entity
+  id: MobBaseAncestorSurgery
+  parent: [MobBaseAncestorCommon, MobDamageableSurgery]
+  abstract: true
+  components:
+  - type: RandomHumanoidProfile
+  - type: Consciousness
+    damageContainer: Biological
+  - type: Targeting
+  - type: SurgeryTarget
+  - type: UserInterface
+    interfaces:
+      enum.StrippingUiKey.Key:
+        type: StrippableBoundUserInterface
+      enum.SurgeryUIKey.Key:
+        type: SurgeryBui
+
+- type: entity
+  id: MobBaseAncestorMonkey
+  parent: [AppearanceMonkey, MobBaseAncestorSurgery]
+  abstract: true
+# end-backmen: ancestor-surgery
 
 - type: entity
   name: monkey
   id: MobMonkey
-  parent: MobBaseAncestor
+  parent: MobBaseAncestorMonkey # backmen: ancestor-surgery
   description: New church of neo-darwinists actually believe that EVERY animal evolved from a monkey. Tastes like pork, and killing them is both fun and relaxing.
   components:
   - type: NameIdentifier
     group: Monkey
+  - type: LanguageSpeaker
+    currentLanguage: Monkey
+  - type: LanguageKnowledge
+    speaks:
+    - Monkey
+    understands:
+    - Monkey
+    - TauCetiBasic # backmen: ghost-role-understand-galactic
   - type: Speech
     speechSounds: Monkey
     speechVerb: Monkey
-  - type: MonkeyAccent
   - type: SentienceTarget
     flavorKind: station-event-random-sentience-flavor-primate
   - type: AlwaysRevolutionaryConvertible
@@ -1506,18 +1587,25 @@
 - type: entity
   name: monkey
   id: MobBaseSyndicateMonkey
-  parent: MobBaseAncestor
+  parent: MobBaseAncestorMonkey # backmen: ancestor-surgery
   description: New church of neo-darwinists actually believe that EVERY animal evolved from a monkey. Tastes like pork, and killing them is both fun and relaxing.
   suffix: syndicate base
   components:
   - type: NameIdentifier
     group: Monkey
+  - type: LanguageSpeaker
+    currentLanguage: Monkey
+  - type: LanguageKnowledge
+    speaks:
+    - Monkey
+    understands:
+    - Monkey
+    - TauCetiBasic # backmen: ghost-role-understand-galactic
   - type: SentienceTarget
     flavorKind: station-event-random-sentience-flavor-primate
   - type: Speech
     speechSounds: Monkey
     speechVerb: Monkey
-  - type: MonkeyAccent
   - type: NpcFactionMember
     factions:
     - Syndicate
@@ -1555,15 +1643,25 @@
 - type: entity
   name: kobold
   id: MobBaseKobold
-  parent: MobBaseAncestor
+  parent: [AppearanceKobold, MobBaseAncestorSurgery] # backmen: ancestor-surgery
   description: Cousins to the sentient race of lizard people, kobolds blend in with their natural habitat and are as nasty as monkeys; ready to pull out your hair and stab you to death.
   abstract: true
   components:
   - type: NameIdentifier
     group: Kobold
   - type: LizardAccent
-  - type: ReplacementAccent
-    accent: kobold
+  # start-backmen: kobold-language
+  # - type: ReplacementAccent
+  #   accent: kobold
+  - type: LanguageSpeaker
+    currentLanguage: Kobold
+  - type: LanguageKnowledge
+    speaks:
+    - Kobold
+    understands:
+    - Kobold
+    - TauCetiBasic
+  # end-backmen: kobold-language
   - type: Speech
     speechSounds: Lizard
     speechVerb: Reptilian
@@ -1609,47 +1707,6 @@
   - type: TemperatureDamage
     heatDamageThreshold: 360
     coldDamageThreshold: 285
-  - type: Sprite
-    drawdepth: Mobs
-    layers:
-    - map: ["enum.DamageStateVisualLayers.Base"]
-      sprite: Mobs/Animals/kobold.rsi
-      state: kobold
-    - map: [ "outline" ]
-      sprite: Mobs/Animals/kobold.rsi
-      state: outline
-    - map: [ "horns" ]
-      sprite: Mobs/Customization/reptilian_parts.rsi
-      state: horns_short
-    - map: [ "enum.HumanoidVisualLayers.Handcuffs" ]
-      color: "#ffffff"
-      sprite: Objects/Misc/handcuffs.rsi
-      state: body-overlay-2
-      visible: false
-    - map: [ "ears" ]
-    - map: [ "id" ]
-    - map: [ "mask" ]
-    - map: [ "head" ]
-    - map: [ "clownedon" ]
-      sprite: "Effects/creampie.rsi"
-      state: "creampie_human"
-      visible: false
-  - type: RandomSprite
-    getAllGroups: true
-    available:
-      - enum.DamageStateVisualLayers.Base:
-          kobold: KoboldColors
-      - horns:
-          horns_curled: KoboldHornColors
-          horns_ram: KoboldHornColors
-          horns_short: KoboldHornColors
-          horns_myrsore: KoboldHornColors
-          horns_bighorn: KoboldHornColors
-          horns_argali: KoboldHornColors
-          horns_ayrshire: KoboldHornColors
-          horns_floppy_kobold_ears: Inherit
-          horns_double: Inherit
-          horns_kobold_ears: Inherit
   - type: Butcherable
     butcheringType: Spike
     spawned:
@@ -1847,8 +1904,18 @@
     spawned:
     - id: FoodMeatRat
       amount: 1
-  - type: ReplacementAccent
-    accent: mouse
+  # start-backmen: mouse-language
+  # - type: ReplacementAccent
+  #   accent: mouse
+  - type: LanguageSpeaker
+    currentLanguage: Mouse
+  - type: LanguageKnowledge
+    speaks:
+    - Mouse
+    understands:
+    - Mouse
+    - TauCetiBasic
+  # end-backmen: mouse-language
   - type: Tag
     tags:
     - Trash
@@ -2937,6 +3004,16 @@
   - type: Tag
     tags:
     - VimPilot
+  # start-backmen: fox-language
+  - type: LanguageSpeaker
+    currentLanguage: Fox
+  - type: LanguageKnowledge
+    speaks:
+    - Fox
+    understands:
+    - Fox
+    - TauCetiBasic
+  # end-backmen: fox-language
 
 - type: entity
   abstract: true
@@ -2981,6 +3058,16 @@
   - type: MobPrice
     price: 200
   - type: MessyDrinker
+  # start-backmen: dog-language
+  - type: LanguageSpeaker
+    currentLanguage: Dog
+  - type: LanguageKnowledge
+    speaks:
+    - Dog
+    understands:
+    - Dog
+    - TauCetiBasic
+  # end-backmen: dog-language
 
 - type: entity
   parent: MobCorgiBase
@@ -2998,8 +3085,10 @@
     spawned:
     - id: FoodMeat
       amount: 2
-  - type: ReplacementAccent
-    accent: dog
+  # start-backmen: dog-language
+  # - type: ReplacementAccent
+  #   accent: dog
+  # end-backmen: dog-language
   - type: Tag
     tags:
     - VimPilot
@@ -3139,8 +3228,18 @@
     spawned:
     - id: FoodMeat
       amount: 3
-  - type: ReplacementAccent
-    accent: cat
+  # start-backmen: cat-language
+  # - type: ReplacementAccent
+  #   accent: cat
+  - type: LanguageSpeaker
+    currentLanguage: Cat
+  - type: LanguageKnowledge
+    speaks:
+    - Cat
+    understands:
+    - Cat
+    - TauCetiBasic
+  # end-backmen: cat-language
   - type: InteractionPopup
     successChance: 0.7
     interactSuccessString: petting-success-cat
@@ -3539,8 +3638,18 @@
     spawned:
     - id: FoodMeat
       amount: 1
-  - type: ReplacementAccent
-    accent: mouse
+  # start-backmen: mouse-language
+  # - type: ReplacementAccent
+  #   accent: mouse
+  - type: LanguageSpeaker
+    currentLanguage: Mouse
+  - type: LanguageKnowledge
+    speaks:
+    - Mouse
+    understands:
+    - Mouse
+    - TauCetiBasic
+  # end-backmen: mouse-language
   - type: Tag
     tags:
     - VimPilot
@@ -3658,8 +3767,18 @@
     interactSuccessSpawn: EffectHearts
     interactSuccessSound:
       path: /Audio/Animals/pig_oink.ogg
-  - type: ReplacementAccent
-    accent: pig
+  # start-backmen: pig-language
+  # - type: ReplacementAccent
+  #   accent: pig
+  - type: LanguageSpeaker
+    currentLanguage: Pig
+  - type: LanguageKnowledge
+    speaks:
+    - Pig
+    understands:
+    - Pig
+    - TauCetiBasic
+  # end-backmen: pig-language
   - type: SentienceTarget
     flavorKind: station-event-random-sentience-flavor-organic
   - type: NpcFactionMember

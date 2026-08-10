@@ -69,17 +69,24 @@
 - type: entity
   parent:
   - AppearanceMonkey
-  - BaseSpeciesMobOrganic
+  - BaseSpeciesMobSurgery
   id: MobMonkeyPlayer
   name: monkey
   description: New church of neo-darwinists actually believe that EVERY animal evolved from a monkey.
   components:
   - type: HumanoidProfile
     species: Monkey
+  - type: LanguageSpeaker
+    currentLanguage: Monkey
+  - type: LanguageKnowledge
+    speaks:
+    - Monkey
+    understands:
+    - Monkey
+    - TauCetiBasic
   - type: Speech
     speechSounds: Monkey
     speechVerb: Monkey
-  - type: MonkeyAccent
   - type: Clumsy
     gunShootFailDamage:
       types:
@@ -138,6 +145,8 @@
     sprite: Mobs/Animals/monkey.rsi
     state: full
 
+# --- Organs (nubody: VisualOrgan on External, like OrganHumanExternal) ---
+
 - type: entity
   parent: OrganBaseOrganic
   id: OrganMonkey
@@ -145,23 +154,18 @@
   suffix: monkey
 
 - type: entity
-  id: OrganMonkeyVisual
+  parent: OrganMonkey
+  id: OrganMonkeyExternal
   abstract: true
   components:
+  - type: Sprite
+    sprite: Mobs/Animals/monkey.rsi
   - type: VisualOrgan
     data:
       sprite: Mobs/Animals/monkey.rsi
   - type: VisualOrganMarkings
     markingData:
       group: Monkey
-
-- type: entity
-  parent: [ OrganMonkey, OrganMonkeyVisual ]
-  id: OrganMonkeyExternal
-  abstract: true
-  components:
-  - type: Sprite
-    sprite: Mobs/Animals/monkey.rsi
 
 - type: entity
   parent: [ OrganBaseTorsoSexed, OrganBaseTorso, OrganMonkeyExternal ]
@@ -204,10 +208,20 @@
   id: OrganMonkeyFootRight
 
 - type: entity
-  parent: [ OrganMonkeyVisual, OrganBaseEyes, OrganAnimalEyes ]
+  parent: [ OrganBaseEyes, OrganMonkey ]
   id: OrganMonkeyEyes
   components:
+  - type: Sprite
+    sprite: Backmen/Mobs/Animals/Monkey/organs.rsi
+    layers:
+    - state: eyeball-l
+    - state: eyeball-r
   - type: VisualOrgan
     data:
       sprite: Mobs/Animals/monkey.rsi
       state: eyes
+  - type: VisualOrganMarkings
+    markingData:
+      group: Monkey
+      layers:
+      - Eyes

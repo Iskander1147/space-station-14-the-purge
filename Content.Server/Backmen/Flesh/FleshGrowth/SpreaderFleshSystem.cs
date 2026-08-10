@@ -2,6 +2,8 @@ using System.Linq;
 using Content.Server.Atmos.Components;
 using Content.Server.Atmos.EntitySystems;
 using Content.Shared.Atmos;
+using Content.Shared.Maps;
+using Content.Shared.Physics;
 using Content.Shared.Tag;
 using Robust.Shared.Random;
 using Content.Server.Destructible;
@@ -26,6 +28,7 @@ public sealed partial class SpreaderFleshSystem : EntitySystem
     [Dependency] private IRobustRandom _robustRandom = default!;
     [Dependency] private SharedMapSystem _mapSystem = default!;
     [Dependency] private TagSystem _tagSystem = default!;
+    [Dependency] private TurfSystem _turf = default!;
 
     /// <summary>
     /// Maximum number of edges that can grow out every interval.
@@ -126,13 +129,14 @@ public sealed partial class SpreaderFleshSystem : EntitySystem
         {
             var direction = (DirectionFlag) (1 << i);
             var coords = transform.Coordinates.Offset(direction.AsDir().ToVec());
-            if (_mapSystem.GetTileRef(transform.GridUid.Value, grid, coords).Tile.IsEmpty || _robustRandom.Prob(1 - spreader.Chance))
+            var tileRef = _mapSystem.GetTileRef(transform.GridUid.Value, grid, coords);
+            if (tileRef.Tile.IsEmpty || _robustRandom.Prob(1 - spreader.Chance))
                 continue;
 
-            var ents =  _mapSystem.GetLocal(transform.GridUid.Value, grid, coords);
+            var ents = _mapSystem.GetLocal(transform.GridUid.Value, grid, coords);
 
-            var entityUids = ents as EntityUid[] ?? ents.ToArray();
-            if (entityUids.Any(x => IsTileBlockedFrom(x, direction)))
+            var entityUids = ents.ToArray();
+            if (entityUids.Any(HasSpreaderFlesh))
                 continue;
 
             var canSpawnWall = true;
@@ -160,6 +164,11 @@ public sealed partial class SpreaderFleshSystem : EntitySystem
                 }
             }
 
+            // Floor growth (incl. under open doors): only if LowImpassable can pass.
+            // Closed/welded doors block LowImpassable; walls use the WallFlesh path below instead.
+            if (canSpawnFloor && _turf.IsTileBlocked(tileRef, CollisionGroup.LowImpassable))
+                continue;
+
             if (canSpawnFloor)
             {
                 didGrow = true;
@@ -180,11 +189,19 @@ public sealed partial class SpreaderFleshSystem : EntitySystem
                     {
                         Trigger = new DamageTrigger { Damage = 5 }
                     };
-                    damageThreshold.Behaviors.Add(new SpawnEntitiesBehavior
+                    // Only restore the original structure when we know its prototype id.
+                    if (!string.IsNullOrEmpty(entityStrucrureId))
                     {
-                        Spawn = new Dictionary<EntProtoId, MinMax> { { entityStrucrureId, new MinMax{Min = 1, Max = 1} } },
-                        Offset = 0f
-                    });
+                        damageThreshold.Behaviors.Add(new SpawnEntitiesBehavior
+                        {
+                            Spawn = new Dictionary<EntProtoId, MinMax>
+                            {
+                                { entityStrucrureId, new MinMax { Min = 1, Max = 1 } },
+                            },
+                            Offset = 0f
+                        });
+                    }
+
                     damageThreshold.Behaviors.Add(new DoActsBehavior
                     {
                         Acts = ThresholdActs.Destruction
@@ -203,14 +220,8 @@ public sealed partial class SpreaderFleshSystem : EntitySystem
         return didGrow;
     }
 
-    private bool IsTileBlockedFrom(EntityUid ent, DirectionFlag dir)
+    private bool HasSpreaderFlesh(EntityUid ent)
     {
-        if (TryComp<SpreaderFleshComponent>(ent, out _))
-            return true;
-
-        if (TryComp<AirtightComponent>(ent, out _))
-            return true;
-
-        return false;
+        return TryComp<SpreaderFleshComponent>(ent, out _);
     }
 }

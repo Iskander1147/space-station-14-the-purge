@@ -870,9 +870,10 @@ public abstract partial class SharedSurgerySystem
             || organComp.Organ == null)
             return;
 
-        var firstOrgan = organComp.Organ.Values.FirstOrDefault();
-        if (firstOrgan == default)
+        if (organComp.Organ.Count == 0)
             return;
+
+        var firstOrgan = organComp.Organ.Values.First();
 
         foreach (var tool in args.Tools)
         {
@@ -1004,9 +1005,10 @@ public abstract partial class SharedSurgerySystem
             || ent.Comp.Organ == null)
             return;
 
-        var organType = ent.Comp.Organ.Values.FirstOrDefault();
-        if (organType == default)
+        if (ent.Comp.Organ.Count == 0)
             return;
+
+        var organType = ent.Comp.Organ.Values.First();
 
         var markingCategory = MarkingCategoriesConversion.FromHumanoidVisualLayers(ent.Comp.MarkingCategory);
         foreach (var tool in args.Tools)
@@ -1016,9 +1018,9 @@ public abstract partial class SharedSurgerySystem
             {
                 _body.ModifyMarkings(args.Body, args.Part, bodyAppearance, ent.Comp.MarkingCategory, markingComp.Marking);
 
-                if (ent.Comp.Accent != null
-                    && ent.Comp.Accent.Values.FirstOrDefault() is { } accent)
+                if (ent.Comp.Accent is { Count: > 0 })
                 {
+                    var accent = ent.Comp.Accent.Values.First();
                     var compType = accent.Component.GetType();
                     if (!HasComp(args.Body, compType))
                         AddComp(args.Body, _compFactory.GetComponent(compType));
@@ -1107,6 +1109,14 @@ public abstract partial class SharedSurgerySystem
 
     private void OnTraumaTreatmentCheck(Entity<SurgeryTraumaTreatmentStepComponent> ent, ref SurgeryStepCompleteCheckEvent args)
     {
+        if (ent.Comp.TraumaType == TraumaType.BoneDamage)
+        {
+            // Wound trauma entities can be gone after surface healing while the bone is still broken.
+            if (_trauma.HasWoundableBoneDamage(args.Part) || _trauma.HasWoundableTrauma(args.Part, TraumaType.BoneDamage))
+                args.Cancelled = true;
+            return;
+        }
+
         if (_trauma.HasWoundableTrauma(args.Part, ent.Comp.TraumaType))
             args.Cancelled = true;
     }
@@ -1632,7 +1642,7 @@ public abstract partial class SharedSurgerySystem
     {
         foreach (var tool in tools)
         {
-            if (EntityManager.TryGetComponent(tool, component.GetType(), out var found) && found is ISurgeryToolComponent toolComp)
+            if (TryComp(tool, component.GetType(), out var found) && found is ISurgeryToolComponent toolComp)
             {
                 withComp = tool;
                 speed = toolComp.Speed;

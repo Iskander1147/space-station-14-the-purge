@@ -11,6 +11,7 @@ lobbyenabled = true
 cryo_sleep_rejoining = true
 lobbyduration=300
 contraband_examine = true
+role_timers = false
 
 # IPIntel stuff
 ipintel_enabled = true
@@ -133,3 +134,7 @@ timermap = 60
 [hub]
 advertise = true
 tags = "lang:ru,rp:med,region:eu_e,tts"
+
+[hunger]
+# Cap starving pain below SoftPainCap (105) so hunger alone does not soft-crit.
+starving_pain_max = 95

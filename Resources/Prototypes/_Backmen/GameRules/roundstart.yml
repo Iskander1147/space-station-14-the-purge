@@ -162,6 +162,7 @@
         - Continental
         #- Lava
         - RuinedMegacity
+        - ShadowVoid
       spawnPointHecate: SpawnPointShipwreckHecate
       hecatePrototype: MobQuestHecateShipwrecked
       eventSchedule:
@@ -198,6 +199,7 @@
     objectives:
     - EscapeThiefShuttleObjective
     - ThiefRaiseGlimmerObjective
+    - ThiefBecomePsionicObjective
     - ThiefSupercritAnomaliesObjective
   - type: AntagRandomObjectives
     sets:

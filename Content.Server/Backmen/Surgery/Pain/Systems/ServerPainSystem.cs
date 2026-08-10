@@ -416,6 +416,7 @@ public sealed partial class ServerPainSystem : PainSystem
 
     private void UpdateNerveSystemNerves(EntityUid uid, EntityUid body, NerveSystemComponent component)
     {
+        var previousNerves = component.Nerves.Keys.ToHashSet();
         component.Nerves.Clear();
         foreach (var bodyPartId in _body.GetWoundableTargets(body))
         {
@@ -423,10 +424,19 @@ public sealed partial class ServerPainSystem : PainSystem
                 continue;
 
             component.Nerves.Add(bodyPartId, nerve);
+            previousNerves.Remove(bodyPartId);
 
             nerve.ParentedNerveSystem = uid;
-            DirtyField(bodyPartId, nerve, nameof(NerveOrganComponent.ParentedNerveSystem));
             UpdatePainFeels(bodyPartId, nerve);
+        }
+
+        foreach (var orphan in previousNerves)
+        {
+            if (!NerveQuery.TryComp(orphan, out var nerve))
+                continue;
+
+            if (nerve.ParentedNerveSystem == uid)
+                nerve.ParentedNerveSystem = EntityUid.Invalid;
         }
 
         CleanupOrphanPainModifiers(uid, body, component);
@@ -495,18 +505,30 @@ public sealed partial class ServerPainSystem : PainSystem
         if (!TryComp<OrganComponent>(uid, out var organ) || !organ.Body.HasValue)
             return;
 
-        var totalPain = FixedPoint2.Zero;
         var woundPain = FixedPoint2.Zero;
+        var otherPain = FixedPoint2.Zero;
+        var suppressant = FixedPoint2.Zero;
 
         foreach (var modifier in nerveSys.Modifiers)
         {
-            if (modifier.Value.PainType == PainType.WoundPain)
-                woundPain += ApplyModifiersToPain(modifier.Key.Item1, modifier.Value.Change, nerveSys, modifier.Value.PainType);
+            var applied = ApplyModifiersToPain(modifier.Key.Item1, modifier.Value.Change, nerveSys, modifier.Value.PainType);
+            // Negative modifiers (e.g. Morphine PainSuppressant) must reduce traumatic/bone pain too —
+            // folding them into WoundPain cancels them out of the traumatic remainder.
+            if (applied < FixedPoint2.Zero)
+            {
+                suppressant += applied;
+                continue;
+            }
 
-            totalPain += ApplyModifiersToPain(modifier.Key.Item1, modifier.Value.Change, nerveSys, modifier.Value.PainType);
+            if (modifier.Value.PainType == PainType.WoundPain)
+                woundPain += applied;
+            else
+                otherPain += applied;
         }
 
-        var newPain = FixedPoint2.Clamp(woundPain, 0, nerveSys.SoftPainCap) + totalPain - woundPain;
+        var newPain = FixedPoint2.Max(
+            FixedPoint2.Zero,
+            FixedPoint2.Clamp(woundPain, 0, nerveSys.SoftPainCap) + otherPain + suppressant);
 
         // throw away the scream, so they instantly do not overlap pain sounds
         nerveSys.NextPainScream = Timing.CurTime + _random.Next(nerveSys.PainScreamsIntervalMin, nerveSys.PainScreamsIntervalMax);
@@ -516,7 +538,9 @@ public sealed partial class ServerPainSystem : PainSystem
             nerveSys.ReactionUpdateTime = Timing.CurTime + nerveSys.PainReactionTime;
         nerveSys.Pain = newPain;
 
-        DirtyField(uid, nerveSys, nameof(NerveSystemComponent.Pain));
+        // Full Dirty (not DirtyField): RT 283.1 (#6685) can emit field deltas when the client's
+        // fromTick <= CreationTick, which PVS asserts against. Unclassified dirty forces a full state.
+        Dirty(uid, nerveSys);
 
         if (!_consciousness.SetConsciousnessModifier(
                 organ.Body.Value,

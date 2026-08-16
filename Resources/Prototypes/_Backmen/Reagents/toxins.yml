@@ -25,9 +25,12 @@
   physicalDesc: reagent-physical-desc-bubbling
   flavor: bitter
   color: "#b428c9"
+  slipData:
+    requiredSlipSpeed: 2.5
+  friction: 0.3
   reactiveEffects:
     Acidic:
-      methods: [ Touch ]
+      methods: [ Touch, Ingestion ]
       effects:
       - !type:Emote
         emote: Scream
@@ -89,13 +92,12 @@
   id: DrinkSlermGlass
   suffix: Slerm
   components:
-  - type: SolutionContainerManager
-    solutions:
-      drink:
-        maxVol: 30
-        reagents:
-        - ReagentId: Slerm
-          Quantity: 30
+  - type: Solution
+    solution:
+      maxVol: 30
+      reagents:
+      - ReagentId: Slerm
+        Quantity: 30
   - type: Icon
     sprite: Objects/Consumable/Drinks/gsodaglass.rsi
     state: icon
@@ -105,13 +107,12 @@
   id: DrinkSlermPlusGlass
   suffix: Slerm Plus
   components:
-  - type: SolutionContainerManager
-    solutions:
-      drink:
-        maxVol: 30
-        reagents:
-        - ReagentId: SlermQueenPlus
-          Quantity: 30
+  - type: Solution
+    solution:
+      maxVol: 30
+      reagents:
+      - ReagentId: SlermQueenPlus
+        Quantity: 30
   - type: Icon
     sprite: Objects/Consumable/Drinks/gsodaglass.rsi
     state: icon

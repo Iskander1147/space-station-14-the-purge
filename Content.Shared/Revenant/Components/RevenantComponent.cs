@@ -230,11 +230,40 @@ public sealed partial class RevenantComponent : Component
     [DataField]
     public TimeSpan HauntEssenceRegenDuration = TimeSpan.FromSeconds(10);
 
+    // start-backmen: haunt-jumpscare
     [DataField]
-    public SoundSpecifier? HauntSound = new SoundCollectionSpecifier("RevenantHaunt");
+    public SoundSpecifier? HauntSound = new SoundCollectionSpecifier("RevenantHauntScreamer", AudioParams.Default.WithVolume(8f));
 
+    /// <summary>
+    /// Brief stun applied with Haunt so the scare is obvious.
+    /// </summary>
+    [DataField]
+    public TimeSpan HauntStunDuration = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// How far Haunt looks for living player witnesses.
+    /// </summary>
+    [DataField]
+    public float HauntRange = 10f;
+
+    /// <summary>
+    /// How long the Haunted status lasts (blocks re-haunt scare and essence). Flash is separate.
+    /// </summary>
+    [DataField]
+    public TimeSpan HauntHauntedDuration = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// How long the flash overlay lasts. Must not use <c>StatusEffectHaunted</c> or blindness lasts the full immunity.
+    /// </summary>
     [DataField]
     public TimeSpan HauntFlashDuration = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Client fullscreen jumpscare duration for haunted witnesses.
+    /// </summary>
+    [DataField]
+    public TimeSpan HauntJumpscareDuration = TimeSpan.FromSeconds(1.1);
+    // end-backmen: haunt-jumpscare
     #endregion
 
     #region Blood Writing

@@ -24,10 +24,11 @@
   - !type:ListingLimitedStockCondition
     stock: 1
 
+# start-backmen: revenant-blight
 - type: listing
   id: RevenantBlight
   name: revenant-blight-name
-  description: revenant-blight-name
+  description: revenant-blight-desc
   productAction: ActionRevenantBlight
   cost:
     StolenEssence: 75
@@ -36,6 +37,7 @@
   conditions:
   - !type:ListingLimitedStockCondition
     stock: 1
+# end-backmen: revenant-blight
 
 - type: listing
   id: RevenantBloodWriting

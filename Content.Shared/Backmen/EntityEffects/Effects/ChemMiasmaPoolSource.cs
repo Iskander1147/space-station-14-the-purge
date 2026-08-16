@@ -20,11 +20,19 @@ public sealed partial class ChemMiasmaPoolSourceEntityEffectSystem : EntityEffec
 
     protected override void Effect(Entity<MobStateComponent> entity, ref EntityEffectEvent<ChemMiasmaPoolSource> args)
     {
-        if (args.Scale != 1f)
+        // Touch/ingestion use reagent quantity as scale (often != 1). Skip only partial ticks.
+        if (args.Scale < 1f)
             return;
 
-        var disease = _rotting.RequestPoolDisease();
-        _disease.TryAddDisease(entity, disease);
+        // One active disease from gas/pool sources — do not stack every pool rotation.
+        if (HasComp<DiseasedComponent>(entity))
+            return;
+
+        var disease = _rotting.RequestPoolDisease(SharedBkRottingSystem.MiasmaPool);
+        if (disease is not { } diseaseId)
+            return;
+
+        _disease.TryAddDisease(entity, diseaseId);
     }
 }
 

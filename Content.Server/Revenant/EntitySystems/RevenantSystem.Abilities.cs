@@ -13,6 +13,22 @@ using Content.Shared.Item;
 using Content.Shared.Bed.Sleep;
 using System.Linq;
 using System.Numerics;
+// start-backmen: revenant-abilities
+using Content.Server._Impstation.Revenant.Components;
+using Content.Server._Impstation.Revenant.EntitySystems;
+using Content.Server.Backmen.Disease;
+using Content.Shared._Impstation.Revenant;
+using Content.Shared._Impstation.Revenant.Components;
+using Content.Shared.Backmen.Disease;
+using Content.Shared.Hands.Components;
+using Content.Shared.Hands.EntitySystems;
+using Content.Shared.Movement.Components;
+using Content.Shared.StatusEffectNew;
+using Content.Shared.Flash;
+using Robust.Shared.Audio.Systems;
+using Robust.Shared.Player;
+using Robust.Server.Player;
+// end-backmen: revenant-abilities
 using Content.Server.Revenant.Components;
 using Content.Shared.Physics;
 using Content.Shared.DoAfter;
@@ -43,8 +59,15 @@ public sealed partial class RevenantSystem
     [Dependency] private GhostSystem _ghost = default!;
     [Dependency] private TileSystem _tile = default!;
     [Dependency] private EntityWhitelistSystem _whitelistSystem = default!;
-    [Dependency] private SharedTransformSystem _transformSystem = default!;
     [Dependency] private SharedMapSystem _mapSystem = default!;
+    // start-backmen: revenant-abilities
+    [Dependency] private SharedHandsSystem _handsSystem = default!;
+    [Dependency] private RevenantAnimatedSystem _revenantAnimated = default!;
+    [Dependency] private SharedAudioSystem _audioSystem = default!;
+    [Dependency] private IPlayerManager _players = default!;
+    [Dependency] private DiseaseSystem _disease = default!;
+    [Dependency] private EntityQuery<DiseaseCarrierComponent> _diseaseCarrierQuery = default!;
+    // end-backmen: revenant-abilities
 
     [Dependency] private EntityQuery<TagComponent> _tagQuery = default!;
     [Dependency] private EntityQuery<EntityStorageComponent> _entityStorageQuery = default!;
@@ -64,6 +87,11 @@ public sealed partial class RevenantSystem
         SubscribeLocalEvent<RevenantComponent, RevenantOverloadLightsActionEvent>(OnOverloadLightsAction);
         SubscribeLocalEvent<RevenantComponent, RevenantBlightActionEvent>(OnBlightAction);
         SubscribeLocalEvent<RevenantComponent, RevenantMalfunctionActionEvent>(OnMalfunctionAction);
+        // start-backmen: revenant-abilities
+        SubscribeLocalEvent<RevenantComponent, RevenantBloodWritingEvent>(OnBloodWritingAction);
+        SubscribeLocalEvent<RevenantComponent, RevenantAnimateEvent>(OnAnimateAction);
+        SubscribeLocalEvent<RevenantComponent, RevenantHauntActionEvent>(OnHauntAction);
+        // end-backmen: revenant-abilities
     }
 
     private void OnInteract(EntityUid uid, RevenantComponent component, UserActivateInWorldEvent args)
@@ -324,7 +352,13 @@ public sealed partial class RevenantSystem
             return;
 
         args.Handled = true;
-        // TODO: When disease refactor is in.
+        // start-backmen: revenant-blight
+        foreach (var ent in _lookup.GetEntitiesInRange(uid, component.BlightRadius))
+        {
+            if (_diseaseCarrierQuery.TryComp(ent, out var carrier))
+                _disease.TryAddDisease(ent, component.BlightDiseasePrototypeId, carrier);
+        }
+        // end-backmen: revenant-blight
     }
 
     private void OnMalfunctionAction(EntityUid uid, RevenantComponent component, RevenantMalfunctionActionEvent args)
@@ -346,4 +380,117 @@ public sealed partial class RevenantSystem
             _emagSystem.TryEmagEffect(uid, uid, ent);
         }
     }
+
+    // start-backmen: revenant-abilities
+    private void OnHauntAction(EntityUid uid, RevenantComponent comp, RevenantHauntActionEvent args)
+    {
+        if (args.Handled)
+            return;
+
+        if (!TryUseAbility(uid, comp, 0, comp.HauntDebuffs))
+            return;
+
+        args.Handled = true;
+
+        // Prefer range lookup over Filter.Pvs(revenant): ghost visibility can make PVS feel empty,
+        // and we need every nearby living player for flash + jumpscare.
+        var witnessFilter = Filter.Empty();
+        var witnessNets = new HashSet<NetEntity>();
+        var newHaunts = 0;
+
+        foreach (var ent in _lookup.GetEntitiesInRange(uid, comp.HauntRange))
+        {
+            if (ent == uid)
+                continue;
+
+            if (!HasComp<MobStateComponent>(ent) || !HasComp<MobMoverComponent>(ent) || HasComp<RevenantComponent>(ent))
+                continue;
+
+            if (!_interact.InRangeUnobstructed(uid, ent, -1, collisionMask: CollisionGroup.Impassable))
+                continue;
+
+            // Already haunted: skip scare entirely until the debuff expires.
+            if (_status.HasStatusEffect(ent, RevenantStatusEffects.Haunted))
+                continue;
+
+            // Flash is a separate short StatusEffectFlashed — not on Haunted, or blindness lasts 3 minutes.
+            _stun.TryUpdateParalyzeDuration(ent, comp.HauntStunDuration);
+            _status.TryAddStatusEffectDuration(ent, SharedFlashSystem.FlashedKey, comp.HauntFlashDuration);
+
+            if (_players.TryGetSessionByEntity(ent, out var session))
+            {
+                witnessFilter.AddPlayer(session);
+                RaiseNetworkEvent(new RevenantHauntJumpscareEvent(comp.HauntJumpscareDuration), session);
+            }
+
+            witnessNets.Add(GetNetEntity(ent));
+
+            if (_status.TryAddStatusEffectDuration(ent, RevenantStatusEffects.Haunted, comp.HauntHauntedDuration))
+                newHaunts++;
+        }
+
+        if (witnessFilter.Count > 0)
+            _audioSystem.PlayGlobal(comp.HauntSound, witnessFilter, true);
+
+        if (newHaunts <= 0)
+            return;
+
+        if (_status.TryAddStatusEffectDuration(uid, RevenantStatusEffects.EssenceRegen, out var regenEnt, comp.HauntEssenceRegenDuration))
+        {
+            var regen = EnsureComp<RevenantRegenModifierStatusEffectComponent>(regenEnt.Value);
+            regen.Witnesses = witnessNets;
+            regen.NewHaunts = newHaunts;
+            Dirty(regenEnt.Value, regen);
+
+            if (_mind.TryGetMind(uid, out _, out var mind)
+                && mind.UserId != null
+                && _players.TryGetSessionById(mind.UserId.Value, out var session))
+                RaiseNetworkEvent(new RevenantHauntWitnessEvent(witnessNets), session);
+
+            _store.TryAddCurrency(
+                new Dictionary<string, FixedPoint2> { { comp.StolenEssenceCurrencyPrototype, comp.HauntStolenEssencePerWitness * newHaunts } },
+                uid);
+        }
+    }
+    // end-backmen: revenant-abilities
+
+    private void OnBloodWritingAction(EntityUid uid, RevenantComponent component, RevenantBloodWritingEvent args)
+    {
+        if (args.Handled)
+            return;
+
+        if (!TryComp<HandsComponent>(uid, out var hands))
+            return;
+
+        if (component.BloodCrayon != null)
+        {
+            _handsSystem.RemoveHand((uid, hands), "crayon");
+            QueueDel(component.BloodCrayon);
+            component.BloodCrayon = null;
+        }
+        else
+        {
+            _handsSystem.AddHand((uid, hands), "crayon", HandLocation.Middle);
+            var crayon = Spawn("CrayonBlood");
+            component.BloodCrayon = crayon;
+            _handsSystem.DoPickup(uid, "crayon", crayon, hands);
+            EnsureComp<BloodCrayonComponent>(crayon);
+        }
+
+        args.Handled = true;
+    }
+
+    private void OnAnimateAction(EntityUid uid, RevenantComponent comp, RevenantAnimateEvent args)
+    {
+        if (args.Handled)
+            return;
+
+        if (_revenantAnimated.CanAnimateObject(args.Target)
+            && TryUseAbility(uid, comp, comp.AnimateCost, comp.AnimateDebuffs))
+        {
+            _revenantAnimated.TryAnimateObject(args.Target, comp.AnimateTime, (uid, comp));
+            args.Handled = true;
+        }
+    }
+    // end-backmen: revenant-abilities
 }

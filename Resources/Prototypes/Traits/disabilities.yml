@@ -81,11 +81,13 @@
   category: Disabilities
   blacklist:
     components:
-    - BSSDrone #backmen: bssdrone
-    - StationAiCustomization  # backmen: AI
-    - BorgChassis
-  components:
-    - type: Muted
+      - BSSDrone #backmen: bssdrone
+      - StationAiCustomization  # backmen: AI
+      - BorgChassis
+  specials:
+  - !type:ApplyStatusEffectSpecial
+    statusEffects:
+    - TraitStatusEffectMuted
 
 - type: trait
   id: Paracusia
@@ -113,7 +115,7 @@
   specials:
   - !type:ApplyStatusEffectSpecial
     statusEffects:
-    - PainNumbnessTraitStatusEffect
+    - TraitStatusEffectPainNumbness
 
 - type: trait
   id: Hemophilia
@@ -123,7 +125,7 @@
   specials:
   - !type:ApplyStatusEffectSpecial
     statusEffects:
-    - StatusEffectHemophiliaTrait
+    - TraitStatusEffectHemophilia
 
 - type: trait
   id: ImpairedMobility
